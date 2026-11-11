@@ -1,0 +1,50 @@
+[
+  {
+    "id": "bust_ease_rule_fitted",
+    "type": "add_ease",
+    "base": "bust",
+    "ease_cm": null,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "awaiting_tailor_approval"
+  },
+  {
+    "id": "waist_ease_rule_fitted",
+    "type": "add_ease",
+    "base": "waist",
+    "ease_cm": null,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "awaiting_tailor_approval"
+  },
+  {
+    "id": "hip_ease_rule_fitted",
+    "type": "add_ease",
+    "base": "hip",
+    "ease_cm": null,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "awaiting_tailor_approval"
+  },
+  {
+    "id": "dress_length_rule",
+    "type": "add_ease",
+    "base": "dress_length",
+    "ease_cm": null,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "awaiting_tailor_approval"
+  }
+]

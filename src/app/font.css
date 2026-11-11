@@ -1,0 +1,244 @@
+/* *
+* @license
+*
+* Font Family: Clash Grotesk
+* Designed by: Indian Type Foundry
+* URL: https://www.fontshare.com/fonts/clash-grotesk
+* 2025 Indian Type Foundry
+*
+* Clash Grotesk Extralight
+* Clash Grotesk Light
+* Clash Grotesk Regular
+* Clash Grotesk Medium
+* Clash Grotesk Semibold
+* Clash Grotesk Bold
+* Clash Grotesk Variable (Variable font)
+* */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;600;700&display=swap");
+
+@font-face {
+  font-family: "ClashGrotesk-Extralight";
+  src:
+    url("../../public/fonts/ClashGrotesk-Extralight.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Extralight.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Extralight.ttf") format("truetype");
+  font-weight: 200;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: "ClashGrotesk-Light";
+  src:
+    url("../../public/fonts/ClashGrotesk-Light.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Light.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: "ClashGrotesk-Regular";
+  src:
+    url("../../public/fonts/ClashGrotesk-Regular.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Regular.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: "ClashGrotesk-Medium";
+  src:
+    url("../../public/fonts/ClashGrotesk-Medium.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Medium.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: "ClashGrotesk-Semibold";
+  src:
+    url("../../public/fonts/ClashGrotesk-Semibold.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Semibold.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Semibold.ttf") format("truetype");
+  font-weight: 600;
+  font-display: swap;
+  font-style: normal;
+}
+@font-face {
+  font-family: "ClashGrotesk-Bold";
+  src:
+    url("../../public/fonts/ClashGrotesk-Bold.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Bold.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+/**
+ * This is a variable font
+ * You can control variable axes as shown below:
+ * font-variation-settings: wght 700.0;
+ *
+ * available axes:
+ 'wght' (range from 200.0 to 700.0
+ */
+@font-face {
+  font-family: "ClashGrotesk-Variable";
+  src:
+    url("../../public/fonts/ClashGrotesk-Variable.woff2") format("woff2"),
+    url("../../public/fonts/ClashGrotesk-Variable.woff") format("woff"),
+    url("../../public/fonts/ClashGrotesk-Variable.ttf") format("truetype");
+  font-weight: 200 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+/**
+* Helvetica Neue Font Family
+*/
+@font-face {
+  font-family: "HelveticaNeue-Black";
+  src: url("../../public/fonts/HelveticaNeueBlack.otf") format("opentype");
+  font-weight: 900;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-BlackItalic";
+  src: url("../../public/fonts/HelveticaNeueBlackItalic.otf") format("opentype");
+  font-weight: 900;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Bold";
+  src: url("../../public/fonts/HelveticaNeueBold.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-BoldItalic";
+  src: url("../../public/fonts/HelveticaNeueBoldItalic.otf") format("opentype");
+  font-weight: 700;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Heavy";
+  src: url("../../public/fonts/HelveticaNeueHeavy.otf") format("opentype");
+  font-weight: 800;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-HeavyItalic";
+  src: url("../../public/fonts/HelveticaNeueHeavyItalic.otf") format("opentype");
+  font-weight: 800;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Italic";
+  src: url("../../public/fonts/HelveticaNeueItalic.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Light";
+  src: url("../../public/fonts/HelveticaNeueLight.otf") format("opentype");
+  font-weight: 300;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-LightItalic";
+  src: url("../../public/fonts/HelveticaNeueLightItalic.otf") format("opentype");
+  font-weight: 300;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Medium";
+  src: url("../../public/fonts/HelveticaNeueMedium.otf") format("opentype");
+  font-weight: 500;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-MediumItalic";
+  src: url("../../public/fonts/HelveticaNeueMediumItalic.otf")
+    format("opentype");
+  font-weight: 500;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Roman";
+  src: url("../../public/fonts/HelveticaNeueRoman.otf") format("opentype");
+  font-weight: 400;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-Thin";
+  src: url("../../public/fonts/HelveticaNeueThin.otf") format("opentype");
+  font-weight: 200;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-ThinItalic";
+  src: url("../../public/fonts/HelveticaNeueThinItalic.otf") format("opentype");
+  font-weight: 200;
+  font-display: swap;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-UltraLight";
+  src: url("../../public/fonts/HelveticaNeueUltraLight.otf") format("opentype");
+  font-weight: 100;
+  font-display: swap;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "HelveticaNeue-UltraLightItalic";
+  src: url("../../public/fonts/HelveticaNeueUltraLightItalic.otf")
+    format("opentype");
+  font-weight: 100;
+  font-display: swap;
+  font-style: italic;
+}
+
+:root {
+  --font-inter:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-poppins: "Poppins", var(--font-inter);
+  --font-helvetica:
+    "HelveticaNeue-Roman", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-clash: "ClashGrotesk-Regular", sans-serif;
+}
+
+body {
+  font-family: var(--font-inter);
+}

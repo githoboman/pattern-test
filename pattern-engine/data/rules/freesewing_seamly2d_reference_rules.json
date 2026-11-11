@@ -1,0 +1,54 @@
+[
+  {
+    "id": "freesewing_bust_ease_fitted",
+    "type": "add_ease",
+    "base": "bust",
+    "ease_cm": 4.0,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "reference_standard",
+    "approved_by": "FreeSewing v3 / Seamly2D (Aldrich close-fitting block)"
+  },
+  {
+    "id": "freesewing_waist_ease_fitted",
+    "type": "add_ease",
+    "base": "waist",
+    "ease_cm": 3.0,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "reference_standard",
+    "approved_by": "FreeSewing v3 / Seamly2D (Aldrich close-fitting block)"
+  },
+  {
+    "id": "freesewing_hip_ease_fitted",
+    "type": "add_ease",
+    "base": "hip",
+    "ease_cm": 4.5,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "reference_standard",
+    "approved_by": "FreeSewing v3 / Seamly2D (Aldrich close-fitting block)"
+  },
+  {
+    "id": "freesewing_dress_length_rule",
+    "type": "add_ease",
+    "base": "dress_length",
+    "ease_cm": 0.0,
+    "applies_to": {
+      "garment_type": "dress",
+      "silhouette": "fitted",
+      "fabric_stretch": "woven"
+    },
+    "status": "reference_standard",
+    "approved_by": "FreeSewing v3 / Seamly2D (Aldrich standard hem drop)"
+  }
+]

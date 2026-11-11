@@ -1,0 +1,33 @@
+{
+  "name": "astra-pattern-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone showcase of the Astra Pattern Studio & Tailor Spec Sheet experience for tailor testing.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "autoprefixer": "^10.4.16",
+    "framer-motion": "^12.23.12",
+    "next": "16.2.1",
+    "postcss": "^8.4.31",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-icons": "^5.5.0",
+    "tailwindcss": "^3.3.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.57",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "typescript": "^5"
+  }
+}
+

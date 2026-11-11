@@ -1,0 +1,49 @@
+{
+  "id": "dress_basic_v1",
+  "garment_type": "dress",
+  "status": "placeholder",
+  "match_rules": {
+    "garment_type": ["dress"],
+    "silhouette": ["fitted"],
+    "sleeves": ["sleeveless", "short", "long"]
+  },
+  "required_body_measurements": ["bust", "waist", "hip", "dress_length"],
+  "finished_measurements": [
+    { "id": "finished_bust", "label": "Finished bust", "rule_id": "bust_ease_rule_fitted" },
+    { "id": "finished_waist", "label": "Finished waist", "rule_id": "waist_ease_rule_fitted" },
+    { "id": "finished_hip", "label": "Finished hip", "rule_id": "hip_ease_rule_fitted" },
+    { "id": "finished_length", "label": "Finished length", "rule_id": "dress_length_rule" }
+  ],
+  "construction_options": {
+    "neckline": ["square", "round", "v_neck"],
+    "sleeves": ["sleeveless", "short", "long"],
+    "closure": ["back_zip", "side_zip", "none"]
+  },
+  "fabric_fields": ["fabric_type", "stretch", "lining"],
+  "seam_allowances_cm": {
+    "standard_seams": 1.5,
+    "invisible_zip": 1.5,
+    "neckline_facing": 1.0,
+    "armhole": 1.0,
+    "hem": 4.0,
+    "status": "reference_standard (FreeSewing / Aldrich)"
+  },
+  "construction_steps": [
+    { "id": "step_1", "text": "Stitch front and back bodice waist darts; press darts inward toward center front and center back.", "status": "reference_standard" },
+    { "id": "step_2", "text": "Join front and back shoulder seams; press open. Attach neckline facing and understitch 2mm from seam.", "status": "reference_standard" },
+    { "id": "step_3", "text": "Insert invisible zipper along center back seam using 1.5 cm seam allowance from neck edge to zipper stop.", "status": "reference_standard" },
+    { "id": "step_4", "text": "Align bodice and skirt side seams, stitch from underarm down through waist and hip to hemline; press open.", "status": "reference_standard" },
+    { "id": "step_5", "text": "Turn up hem allowance by 4.0 cm, press crisply, and finish with blind hem stitch or topstitch.", "status": "reference_standard" }
+  ],
+  "drawing_components": [
+    "bodice_front",
+    "bodice_back",
+    "neckline_square",
+    "neckline_round",
+    "neckline_v_neck",
+    "sleeve_sleeveless",
+    "sleeve_short",
+    "sleeve_long",
+    "skirt_fitted"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "_warning": "TEST DATA ONLY. NOT TAILOR-APPROVED. Loaded only when ASTRA_DEMO_MODE=true. The single value below is the illustration from the project brief (92 cm + 4 cm = 96 cm). Do not add invented values here; add numbers only when the owner supplies them as labelled test data.",
+  "rules": [
+    {
+      "id": "test_bust_ease_rule",
+      "type": "add_ease",
+      "base": "bust",
+      "ease_cm": 4.0,
+      "applies_to": { "garment_type": "dress", "silhouette": "fitted", "fabric_stretch": "woven" },
+      "status": "test_data"
+    }
+  ]
+}
