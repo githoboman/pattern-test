@@ -691,7 +691,7 @@ export default function TailorPackStudio() {
     }
   };
 
-  // Multi-Signal Cloth & Fastening Detection Engine (Offscreen HTML5 Canvas Silhouette + Text Signals)
+  // Multi-Signal Cloth & Fastening Detection Engine (Offscreen HTML5 Canvas Silhouette + Contour + Text Signals)
   const runVisualClothDetection = async (
     imgSrc: string,
     fileNameHint: string | null,
@@ -700,12 +700,14 @@ export default function TailorPackStudio() {
   ) => {
     const combinedHint = `${imgSrc.startsWith("data:") ? "" : imgSrc} ${fileNameHint || ""} ${notesHint}`.toLowerCase();
 
-    // 1. Inspect image pixels via Offscreen HTML5 Canvas for silhouette width profile, center placket contrast & dominant color
+    // 1. Inspect image pixels via Offscreen HTML5 Canvas across relative garment bounding box
     let flareRatio = 1.05;
     let waistPinchRatio = 0.85;
     let verticalSpanRatio = 0.78;
     let centerPlacketScore = 0;
     let shoulderSpreadRatio = 1.0;
+    let bboxAspect = 1.5;
+    let topCenterOpenness = 0;
     let hexColor = "#27272A";
 
     try {
@@ -715,34 +717,59 @@ export default function TailorPackStudio() {
         verticalSpanRatio: number;
         centerPlacketScore: number;
         shoulderSpreadRatio: number;
+        bboxAspect: number;
+        topCenterOpenness: number;
         hexColor: string;
       }>((resolve) => {
         const img = new window.Image();
         img.crossOrigin = "anonymous";
         img.onload = () => {
           try {
-            const W = 64;
-            const H = 80;
+            const W = 72;
+            const H = 90;
             const canvas = document.createElement("canvas");
             canvas.width = W;
             canvas.height = H;
             const ctx = canvas.getContext("2d");
             if (!ctx) {
-              resolve({ flareRatio: 1.05, waistPinchRatio: 0.85, verticalSpanRatio: 0.78, centerPlacketScore: 0, shoulderSpreadRatio: 1.0, hexColor: "#27272A" });
+              resolve({
+                flareRatio: 1.05,
+                waistPinchRatio: 0.85,
+                verticalSpanRatio: 0.78,
+                centerPlacketScore: 0,
+                shoulderSpreadRatio: 1.0,
+                bboxAspect: 1.5,
+                topCenterOpenness: 0,
+                hexColor: "#27272A"
+              });
               return;
             }
             ctx.drawImage(img, 0, 0, W, H);
             const data = ctx.getImageData(0, 0, W, H).data;
 
-            // Sample corner background RGB
-            const corners = [0, (W - 1) * 4, (H - 1) * W * 4, ((H - 1) * W + (W - 1)) * 4];
-            let bgR = 0, bgG = 0, bgB = 0;
-            for (const c of corners) {
-              bgR += data[c];
-              bgG += data[c + 1];
-              bgB += data[c + 2];
+            // Sample full outer border RGB so varied backdrops don't bias silhouette bounds
+            let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+            for (let x = 0; x < W; x += 4) {
+              for (const y of [0, 1, H - 2, H - 1]) {
+                const idx = (y * W + x) * 4;
+                bgR += data[idx];
+                bgG += data[idx + 1];
+                bgB += data[idx + 2];
+                bgCount++;
+              }
             }
-            bgR /= 4; bgG /= 4; bgB /= 4;
+            for (let y = 2; y < H - 2; y += 4) {
+              for (const x of [0, 1, W - 2, W - 1]) {
+                const idx = (y * W + x) * 4;
+                bgR += data[idx];
+                bgG += data[idx + 1];
+                bgB += data[idx + 2];
+                bgCount++;
+              }
+            }
+            bgR /= Math.max(1, bgCount);
+            bgG /= Math.max(1, bgCount);
+            bgB /= Math.max(1, bgCount);
 
             const isFg = (x: number, y: number) => {
               const idx = (y * W + x) * 4;
@@ -751,12 +778,35 @@ export default function TailorPackStudio() {
               const dr = data[idx] - bgR;
               const dg = data[idx + 1] - bgG;
               const db = data[idx + 2] - bgB;
-              return Math.sqrt(dr * dr + dg * dg + db * db) > 26;
+              return Math.sqrt(dr * dr + dg * dg + db * db) > 24;
             };
 
-            const rowWidth = (yStart: number, yEnd: number) => {
-              let sumW = 0;
-              let count = 0;
+            let minY = H, maxY = 0, minX = W, maxX = 0;
+            for (let y = 2; y < H - 2; y++) {
+              for (let x = 4; x < W - 4; x++) {
+                if (isFg(x, y)) {
+                  if (y < minY) minY = y;
+                  if (y > maxY) maxY = y;
+                  if (x < minX) minX = x;
+                  if (x > maxX) maxX = x;
+                }
+              }
+            }
+            if (maxY - minY < 16) {
+              minY = Math.round(H * 0.1);
+              maxY = Math.round(H * 0.9);
+            }
+            if (maxX - minX < 12) {
+              minX = Math.round(W * 0.22);
+              maxX = Math.round(W * 0.78);
+            }
+            const spanH = Math.max(18, maxY - minY);
+            const midX = Math.round((minX + maxX) / 2);
+
+            const bandWidth = (fracStart: number, fracEnd: number) => {
+              const yStart = Math.max(1, Math.round(minY + spanH * fracStart));
+              const yEnd = Math.min(H - 2, Math.round(minY + spanH * fracEnd));
+              let sumW = 0, count = 0;
               for (let y = yStart; y <= yEnd; y++) {
                 let left = W, right = 0;
                 for (let x = 2; x < W - 2; x++) {
@@ -770,39 +820,39 @@ export default function TailorPackStudio() {
                   count++;
                 }
               }
-              return count > 0 ? sumW / count : 24;
+              return count > 0 ? sumW / count : maxX - minX;
             };
 
-            let minY = H, maxY = 0;
-            for (let y = 2; y < H - 2; y++) {
-              for (let x = 6; x < W - 6; x++) {
-                if (isFg(x, y)) {
-                  if (y < minY) minY = y;
-                  if (y > maxY) maxY = y;
-                }
-              }
+            const upperW = bandWidth(0.14, 0.28);
+            const waistW = bandWidth(0.42, 0.54);
+            const lowerW = bandWidth(0.76, 0.90);
+
+            // Top-center neck gap openness
+            let openRows = 0, neckRows = 0;
+            for (let y = Math.round(minY + spanH * 0.04); y <= Math.round(minY + spanH * 0.18); y++) {
+              neckRows++;
+              if (!isFg(midX, y)) openRows++;
             }
 
-            const upperW = rowWidth(16, 26);
-            const waistW = rowWidth(34, 44);
-            const lowerW = rowWidth(52, 68);
-
-            // Center-front vertical placket/button line contrast (checks horizontal gradient across x = 29..35)
-            let placketDiff = 0;
-            for (let y = 20; y <= 50; y++) {
-              const iLeft = (y * W + 30) * 4;
-              const iCenter = (y * W + 32) * 4;
-              const iRight = (y * W + 34) * 4;
+            // Center-front vertical placket / lapel / button contrast along center column
+            let placketDiff = 0, placketSamples = 0;
+            for (let y = Math.round(minY + spanH * 0.16); y <= Math.round(minY + spanH * 0.75); y++) {
+              const iLeft = (y * W + Math.max(0, midX - 2)) * 4;
+              const iCenter = (y * W + midX) * 4;
+              const iRight = (y * W + Math.min(W - 1, midX + 2)) * 4;
               placketDiff +=
                 Math.abs(data[iCenter] - data[iLeft]) +
                 Math.abs(data[iCenter] - data[iRight]);
+              placketSamples++;
             }
-            const normPlacket = placketDiff / 31;
+            const normPlacket = placketSamples > 0 ? placketDiff / placketSamples : 0;
 
-            // Dominant garment color from center bodice
+            // Dominant cloth color sampled from center bodice region
             let rSum = 0, gSum = 0, bSum = 0, cCount = 0;
-            for (let y = 24; y <= 46; y++) {
-              for (let x = 22; x <= 42; x++) {
+            const cY0 = Math.round(minY + spanH * 0.25);
+            const cY1 = Math.round(minY + spanH * 0.58);
+            for (let y = cY0; y <= cY1; y++) {
+              for (let x = Math.max(2, midX - 10); x <= Math.min(W - 3, midX + 10); x++) {
                 if (isFg(x, y)) {
                   const idx = (y * W + x) * 4;
                   rSum += data[idx];
@@ -820,20 +870,41 @@ export default function TailorPackStudio() {
               domHex = `#${rHex}${gHex}${bHex}`.toUpperCase();
             }
 
+            const avgW = (upperW + waistW + lowerW) / 3;
             resolve({
-              flareRatio: lowerW / Math.max(12, waistW),
-              waistPinchRatio: waistW / Math.max(12, upperW),
-              verticalSpanRatio: Math.max(0.4, (maxY - minY) / H),
+              flareRatio: lowerW / Math.max(10, waistW),
+              waistPinchRatio: waistW / Math.max(10, upperW),
+              verticalSpanRatio: spanH / H,
               centerPlacketScore: normPlacket,
-              shoulderSpreadRatio: upperW / Math.max(12, waistW),
+              shoulderSpreadRatio: upperW / Math.max(10, waistW),
+              bboxAspect: spanH / Math.max(10, avgW),
+              topCenterOpenness: neckRows > 0 ? openRows / neckRows : 0,
               hexColor: domHex
             });
           } catch {
-            resolve({ flareRatio: 1.05, waistPinchRatio: 0.85, verticalSpanRatio: 0.78, centerPlacketScore: 0, shoulderSpreadRatio: 1.0, hexColor: "#27272A" });
+            resolve({
+              flareRatio: 1.05,
+              waistPinchRatio: 0.85,
+              verticalSpanRatio: 0.78,
+              centerPlacketScore: 0,
+              shoulderSpreadRatio: 1.0,
+              bboxAspect: 1.5,
+              topCenterOpenness: 0,
+              hexColor: "#27272A"
+            });
           }
         };
         img.onerror = () => {
-          resolve({ flareRatio: 1.05, waistPinchRatio: 0.85, verticalSpanRatio: 0.78, centerPlacketScore: 0, shoulderSpreadRatio: 1.0, hexColor: "#27272A" });
+          resolve({
+            flareRatio: 1.05,
+            waistPinchRatio: 0.85,
+            verticalSpanRatio: 0.78,
+            centerPlacketScore: 0,
+            shoulderSpreadRatio: 1.0,
+            bboxAspect: 1.5,
+            topCenterOpenness: 0,
+            hexColor: "#27272A"
+          });
         };
         img.src = imgSrc;
       });
@@ -843,11 +914,13 @@ export default function TailorPackStudio() {
       verticalSpanRatio = pixelStats.verticalSpanRatio;
       centerPlacketScore = pixelStats.centerPlacketScore;
       shoulderSpreadRatio = pixelStats.shoulderSpreadRatio;
+      bboxAspect = pixelStats.bboxAspect;
+      topCenterOpenness = pixelStats.topCenterOpenness;
       hexColor = pixelStats.hexColor;
       setDetectedColorHex(hexColor);
     } catch {}
 
-    // 2. Classify Outfit Block & Fastening using both Visual Silhouette Metrics + Filename/Notes Hints
+    // 2. Classify Outfit Block using Filename/Notes + Real Bounding Silhouette Ratios
     let chosenBlock: "Sheath Dress" | "A-Line Dress" | "Slip Dress" | "Tailored Blazer" | "Button-Down Shirt" | "Kaftan / Boubou" = "Sheath Dress";
 
     if (
@@ -856,6 +929,8 @@ export default function TailorPackStudio() {
       combinedHint.includes("bubu") ||
       combinedHint.includes("agbada") ||
       combinedHint.includes("kimono") ||
+      combinedHint.includes("abaya") ||
+      combinedHint.includes("robe") ||
       combinedHint.includes("how_it_works")
     ) {
       chosenBlock = "Kaftan / Boubou";
@@ -865,6 +940,7 @@ export default function TailorPackStudio() {
       combinedHint.includes("button-down") ||
       combinedHint.includes("button down") ||
       combinedHint.includes("top") ||
+      combinedHint.includes("polo") ||
       combinedHint.includes("placeholder_3")
     ) {
       chosenBlock = "Button-Down Shirt";
@@ -879,7 +955,8 @@ export default function TailorPackStudio() {
       combinedHint.includes("placeholder_2") ||
       combinedHint.includes("a-line") ||
       combinedHint.includes("flare") ||
-      combinedHint.includes("skater")
+      combinedHint.includes("skater") ||
+      combinedHint.includes("gown")
     ) {
       chosenBlock = "A-Line Dress";
     } else if (
@@ -890,20 +967,22 @@ export default function TailorPackStudio() {
       combinedHint.includes("strap")
     ) {
       chosenBlock = "Slip Dress";
-    } else if (combinedHint.includes("placeholder_1")) {
+    } else if (combinedHint.includes("placeholder_1") || combinedHint.includes("sheath") || combinedHint.includes("pencil")) {
       chosenBlock = "Sheath Dress";
     } else {
-      // Pure visual classification for arbitrary uploaded photos without keyword hints
-      if (verticalSpanRatio < 0.64 && centerPlacketScore > 22) {
-        chosenBlock = shoulderSpreadRatio > 1.18 ? "Tailored Blazer" : "Button-Down Shirt";
-      } else if (waistPinchRatio > 0.96 && flareRatio > 0.98 && verticalSpanRatio > 0.75) {
+      // Multi-cue visual classification for arbitrary uploaded photos without keywords
+      if (bboxAspect < 1.25 && centerPlacketScore > 16) {
+        chosenBlock = shoulderSpreadRatio > 1.12 ? "Tailored Blazer" : "Button-Down Shirt";
+      } else if (waistPinchRatio > 0.95 && shoulderSpreadRatio < 1.05 && flareRatio >= 0.98 && verticalSpanRatio > 0.72) {
         chosenBlock = "Kaftan / Boubou";
-      } else if (flareRatio > 1.24) {
+      } else if (flareRatio > 1.18) {
         chosenBlock = "A-Line Dress";
-      } else if (centerPlacketScore > 34) {
+      } else if (centerPlacketScore > 26 || (bboxAspect < 1.32 && flareRatio < 1.06)) {
         chosenBlock = "Button-Down Shirt";
-      } else if (shoulderSpreadRatio < 0.86) {
+      } else if (topCenterOpenness > 0.45 && shoulderSpreadRatio < 0.92) {
         chosenBlock = "Slip Dress";
+      } else if (topCenterOpenness > 0.55 && centerPlacketScore > 18) {
+        chosenBlock = "Tailored Blazer";
       } else {
         chosenBlock = "Sheath Dress";
       }
@@ -911,7 +990,27 @@ export default function TailorPackStudio() {
 
     handleGarmentBlockChange(chosenBlock);
 
-    // 3. Apply any explicit Fastening / Closure overrides from notes or filename (since not all clothes use a zipper!)
+    // 3. Apply explicit Neckline / Sleeve / Closure overrides from notes or visual cues
+    if (combinedHint.includes("v-neck") || combinedHint.includes("v neck")) {
+      handleNecklineChange("V-Neck");
+    } else if (combinedHint.includes("round") || combinedHint.includes("crew")) {
+      handleNecklineChange("Round");
+    } else if (combinedHint.includes("sweetheart") || combinedHint.includes("cowl")) {
+      handleNecklineChange("Sweetheart");
+    } else if (combinedHint.includes("square")) {
+      handleNecklineChange("Square");
+    } else if (topCenterOpenness > 0.55 && chosenBlock !== "Button-Down Shirt") {
+      handleNecklineChange("V-Neck");
+    }
+
+    if (combinedHint.includes("long sleeve") || combinedHint.includes("full sleeve")) {
+      handleSleeveChange("Long");
+    } else if (combinedHint.includes("short sleeve") || combinedHint.includes("half sleeve")) {
+      handleSleeveChange("Short");
+    } else if (combinedHint.includes("sleeveless") || combinedHint.includes("strapless")) {
+      handleSleeveChange("Sleeveless");
+    }
+
     let finalClosureLabel =
       chosenBlock === "Tailored Blazer" || chosenBlock === "Button-Down Shirt"
         ? "Front Button Placket"
@@ -951,7 +1050,7 @@ export default function TailorPackStudio() {
       setCurrentStep(2);
       triggerToast(
         `Detected: ${chosenBlock}`,
-        `Fastening set to "${finalClosureLabel}" • Dominance ${hexColor}`
+        `Fastening set to "${finalClosureLabel}" • Swatch ${hexColor}`
       );
     } else {
       triggerToast(
@@ -1098,10 +1197,10 @@ export default function TailorPackStudio() {
 
     const summaryText = [
       `ASTRA TAILOR PATTERN SHEET (v${versionNumber}.0 - ${versionStatus})`,
-      `Style: ${necklineCut}-Neck ${sleeveCut === "Sleeveless" ? "Sleeveless" : `${sleeveCut}-Sleeve`} Dress (${hemCut} Length)`,
+      `Garment: ${garmentBlock} (${necklineCut}-Neck · ${sleeveCut === "Sleeveless" ? "Sleeveless" : `${sleeveCut}-Sleeve`} · ${hemCut} Length)`,
       `Size: ${selectedSize} (${silhouetteFit} Fit)`,
       ``,
-      `FINAL DRESS MEASUREMENTS (Body + Comfort Room):`,
+      `FINAL ${garmentBlock.toUpperCase()} MEASUREMENTS (Body + Comfort Room):`,
       `- Bust: ${finB} cm (${(Number(finB) / 2.54).toFixed(1)} in) [Body ${bodyBust}cm + ${easeValues.bust}cm ease]`,
       `- Waist: ${finW} cm (${(Number(finW) / 2.54).toFixed(1)} in) [Body ${bodyWaist}cm + ${easeValues.waist}cm ease]`,
       `- Hip: ${finH} cm (${(Number(finH) / 2.54).toFixed(1)} in) [Body ${bodyHip}cm + ${easeValues.hip}cm ease]`,
@@ -1146,7 +1245,6 @@ export default function TailorPackStudio() {
     const pWaistW = Math.round(46 + (finWaistNum - 77) * 0.4);
     const pHipW = Math.round(58 + (finHipNum - 102.5) * 0.42);
     const pHemW = Math.round(hemCut === "Maxi" ? pHipW + 14 : hemCut === "Mini" ? pHipW - 2 : pHipW + 5);
-    const pZipY = Math.min(pHemY - 35, 275);
 
     const pNeckClosure =
       necklineCut === "Round"
@@ -1190,11 +1288,22 @@ export default function TailorPackStudio() {
       `Z`
     ].join(" ");
 
+    let liveSvgMarkup = "";
+    try {
+      if (svgRef.current) {
+        let rawSvg = new XMLSerializer().serializeToString(svgRef.current);
+        if (!rawSvg.includes('xmlns="http://www.w3.org/2000/svg"')) {
+          rawSvg = rawSvg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+        }
+        liveSvgMarkup = rawSvg.replace(/class="[^"]*"/g, "").replace(/style="[^"]*"/, 'style="width:100%;max-width:780px;height:auto;margin:0 auto;display:block;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;"');
+      }
+    } catch {}
+
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Astra Tailor Pack - Dress v${versionNumber}</title>
+  <title>Astra Tailor Pack - ${garmentBlock} v${versionNumber}</title>
   <style>
     @page { size: A4 portrait; margin: 14mm; }
     body {
@@ -1313,7 +1422,7 @@ export default function TailorPackStudio() {
     <div>
       <div class="brand-title">ASTRA PATTERN & TAILOR SHEET</div>
       <div style="font-size: 11.5px; color: #27272a;">
-        <strong>Style:</strong> ${necklineCut}-Neck ${sleeveCut === "Sleeveless" ? "Sleeveless" : `${sleeveCut}-Sleeve`} Dress |
+        <strong>Block:</strong> ${garmentBlock} (${necklineCut}-Neck · ${sleeveCut === "Sleeveless" ? "Sleeveless" : `${sleeveCut}-Sleeve`}) |
         <strong>Size:</strong> ${selectedSize} |
         <strong>Length:</strong> ${hemCut} (${bodyLength} cm) &bull; ${silhouetteFit}
         <span class="badge ${versionStatus === "Approved for Sampling" ? "badge-approved" : "badge-draft"}">
@@ -1347,14 +1456,14 @@ export default function TailorPackStudio() {
     </div>
   </div>
 
-  <div class="card-title" style="margin-top: 12px;">3. Body vs. Finished Dress Measurements (Size: ${selectedSize})</div>
+  <div class="card-title" style="margin-top: 12px;">3. Body vs. Finished ${garmentBlock} Measurements (Size: ${selectedSize})</div>
   <table>
     <thead>
       <tr>
         <th>Area</th>
         <th>Body Size (cm)</th>
         <th>Comfort Room Added</th>
-        <th style="background: #333333; color: #ffffff;">Final Dress Size (cm)</th>
+        <th style="background: #333333; color: #ffffff;">Final ${garmentBlock} Size (cm)</th>
         <th>Seam Allowance</th>
       </tr>
     </thead>
@@ -1390,9 +1499,12 @@ export default function TailorPackStudio() {
     </tbody>
   </table>
 
-  <div class="card-title">4. 1:10 Pattern Drawing (Front & Back Pieces)</div>
+  <div class="card-title">4. 1:10 Pattern Drawing (Front & Back Pieces — ${garmentBlock})</div>
   <div class="drawing-container">
-    <svg viewBox="0 0 860 475" width="100%" height="275" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 780px; margin: 0 auto; display: block;">
+    ${
+      liveSvgMarkup
+        ? liveSvgMarkup
+        : `<svg viewBox="0 0 860 475" width="100%" height="275" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; max-width: 780px; margin: 0 auto; display: block;">
       <defs>
         <pattern id="printGrid" width="20" height="20" patternUnits="userSpaceOnUse">
           <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e5e5e5" stroke-width="0.6" />
@@ -1400,65 +1512,16 @@ export default function TailorPackStudio() {
       </defs>
       <rect width="860" height="475" fill="url(#printGrid)" rx="4" />
       <rect x="1" y="1" width="858" height="473" fill="none" stroke="#bdbdbd" stroke-width="1.2" rx="4" />
-
-      <!-- FRONT BLOCK -->
       <g transform="translate(220, 16)">
         <text x="0" y="16" fill="#333333" font-size="11" text-anchor="middle" font-weight="600" letter-spacing="1">FRONT CAD BLOCK (${selectedSize})</text>
-        <!-- Outer Seam Allowance Cut Line -->
-        <path d="${pFrontStitch}" transform="scale(1.055, 1.02) translate(0, -4)" fill="none" stroke="#757575" stroke-width="1" stroke-dasharray="4 3" />
-        <!-- Net Sewing Line -->
         <path d="${pFrontStitch}" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linejoin="round" />
-        <!-- Facing Line -->
-        <path d="M -33 46 L -33 92 L 33 92 L 33 46" fill="none" stroke="#4f4f4f" stroke-width="1" stroke-dasharray="3 2" />
-        <!-- Center Front Grainline -->
-        <line x1="0" y1="84" x2="0" y2="${pHemY}" stroke="#a1a1aa" stroke-width="0.8" stroke-dasharray="2 3" />
-        <line x1="-38" y1="145" x2="-38" y2="${pHemY - 45}" stroke="#4f4f4f" stroke-width="1.1" />
-        <polygon points="-38,140 -41,148 -35,148" fill="#4f4f4f" />
-        <polygon points="-38,${pHemY - 40} -41,${pHemY - 48} -35,${pHemY - 48}" fill="#4f4f4f" />
-        <!-- Anatomical Level Lines -->
-        <line x1="-${pBustW}" y1="122" x2="${pBustW}" y2="122" stroke="#757575" stroke-width="0.9" stroke-dasharray="3 3" />
-        <line x1="-${pWaistW}" y1="210" x2="${pWaistW}" y2="210" stroke="#4f4f4f" stroke-width="1" stroke-dasharray="4 3" />
-        <line x1="-${pHipW}" y1="298" x2="${pHipW}" y2="298" stroke="#757575" stroke-width="0.9" stroke-dasharray="3 3" />
-        <!-- Bust Apex Targets & Side Bust Darts -->
-        <circle cx="-24" cy="128" r="3.5" fill="none" stroke="#4f4f4f" stroke-width="1" />
-        <circle cx="24" cy="128" r="3.5" fill="none" stroke="#4f4f4f" stroke-width="1" />
-        <path d="M -${pBustW} 142 L -28 130 L -${pBustW - 1} 154" fill="none" stroke="#4f4f4f" stroke-width="1.1" />
-        <path d="M ${pBustW} 142 L 28 130 L ${pBustW - 1} 154" fill="none" stroke="#4f4f4f" stroke-width="1.1" />
-        <!-- Diamond Waist Suppression Darts -->
-        <path d="M -23 150 L -18 210 L -23 268 L -28 210 Z" fill="rgba(79,79,79,0.06)" stroke="#4f4f4f" stroke-width="1.2" />
-        <path d="M 23 150 L 28 210 L 23 268 L 18 210 Z" fill="rgba(79,79,79,0.06)" stroke="#4f4f4f" stroke-width="1.2" />
-        <!-- Hem Allowance Fold -->
-        <path d="M -${pHemW - 1} ${pHemY - 14} Q 0 ${pHemY - 8} ${pHemW - 1} ${pHemY - 14}" fill="none" stroke="#757575" stroke-width="1" stroke-dasharray="3 3" />
-        <!-- Dimension Callouts -->
-        <text x="${pBustW + 14}" y="125" fill="#333333" font-size="9.5" font-weight="500">BUST ${finishedBust}cm</text>
-        <text x="${pWaistW + 14}" y="213" fill="#333333" font-size="9.5" font-weight="500">WAIST ${finishedWaist}cm</text>
-        <text x="${pHipW + 14}" y="301" fill="#333333" font-size="9.5" font-weight="500">HIP ${finishedHip}cm</text>
-        <line x1="-${pHemW + 24}" y1="42" x2="-${pHemW + 24}" y2="${pHemY}" stroke="#4f4f4f" stroke-width="1.2" />
-        <text x="-${pHemW + 32}" y="${(pHemY + 42) / 2}" fill="#333333" font-size="9.5" font-weight="500" text-anchor="end">LEN ${finishedLength}cm</text>
       </g>
-
-      <!-- BACK BLOCK -->
       <g transform="translate(630, 16)">
         <text x="0" y="16" fill="#333333" font-size="11" text-anchor="middle" font-weight="600" letter-spacing="1">BACK CAD BLOCK (${selectedSize})</text>
-        <!-- Outer Seam Allowance Cut Line -->
-        <path d="${pBackStitch}" transform="scale(1.055, 1.02) translate(0, -4)" fill="none" stroke="#757575" stroke-width="1" stroke-dasharray="4 3" />
-        <!-- Net Sewing Line -->
         <path d="${pBackStitch}" fill="#ffffff" stroke="#333333" stroke-width="2" stroke-linejoin="round" />
-        <!-- Back Neck Facing -->
-        <path d="M -32 45 Q 0 62 32 45" fill="none" stroke="#4f4f4f" stroke-width="1" stroke-dasharray="3 2" />
-        <!-- Center Back Invisible Zipper Track -->
-        <line x1="0" y1="50" x2="0" y2="${pZipY}" stroke="#333333" stroke-width="2" stroke-dasharray="5 2.5" />
-        <rect x="-4" y="52" width="8" height="10" rx="1.5" fill="#4f4f4f" />
-        <line x1="-6" y1="${pZipY}" x2="6" y2="${pZipY}" stroke="#333333" stroke-width="1.8" />
-        <line x1="0" y1="${pZipY}" x2="0" y2="${pHemY}" stroke="#4f4f4f" stroke-width="1.3" />
-        <!-- Back Waist Darts -->
-        <path d="M -23 142 L -17 210 L -23 274 L -29 210 Z" fill="rgba(79,79,79,0.06)" stroke="#4f4f4f" stroke-width="1.2" />
-        <path d="M 23 142 L 29 210 L 23 274 L 17 210 Z" fill="rgba(79,79,79,0.06)" stroke="#4f4f4f" stroke-width="1.2" />
-        <!-- Hem Allowance Fold -->
-        <path d="M -${pHemW - 1} ${pHemY - 14} Q 0 ${pHemY - 9} ${pHemW - 1} ${pHemY - 14}" fill="none" stroke="#757575" stroke-width="1" stroke-dasharray="3 3" />
-        <text x="${pBustW + 14}" y="175" fill="#333333" font-size="9.5" font-weight="500">55cm CB ZIPPER</text>
       </g>
-    </svg>
+    </svg>`
+    }
   </div>
 
   <div class="grid-2">
@@ -1518,12 +1581,14 @@ export default function TailorPackStudio() {
     try {
       const tailorPackHTML = buildClientTailorPackHTML();
 
+      const blockSlug = garmentBlock.replace(/[^a-zA-Z0-9]+/g, "_");
+
       // 1. Direct downloadable HTML backup file
       const blob = new Blob([tailorPackHTML], { type: "text/html;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Astra_TailorPack_Dress_v${versionNumber}.html`;
+      link.download = `Astra_TailorPack_${blockSlug}_v${versionNumber}.html`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1545,7 +1610,7 @@ export default function TailorPackStudio() {
 
       triggerToast(
         "Tailor Pack Blueprint Exported!",
-        `Print dialog opened (Save as PDF) & Astra_TailorPack_Dress_v${versionNumber}.html downloaded.`
+        `Print dialog opened (Save as PDF) & Astra_TailorPack_${blockSlug}_v${versionNumber}.html downloaded.`
       );
     } catch (err) {
       console.error("Export error", err);
@@ -1556,6 +1621,7 @@ export default function TailorPackStudio() {
   // Export 2: Direct CAD SVG Download (for Seamly2D, Clo3D, or Illustrator)
   const handleDownloadSVG = () => {
     try {
+      const blockSlug = garmentBlock.replace(/[^a-zA-Z0-9]+/g, "_");
       let svgContent = "";
       if (svgRef.current) {
         svgContent = new XMLSerializer().serializeToString(svgRef.current);
@@ -1574,13 +1640,13 @@ export default function TailorPackStudio() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `Astra_Technical_Flat_Dress_v${versionNumber}.svg`;
+      link.download = `Astra_Technical_Flat_${blockSlug}_v${versionNumber}.svg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      triggerToast("Vector CAD SVG Downloaded", `Astra_Technical_Flat_Dress_v${versionNumber}.svg ready for CAD import.`);
+      triggerToast("Vector CAD SVG Downloaded", `Astra_Technical_Flat_${blockSlug}_v${versionNumber}.svg ready for CAD import.`);
     } catch (err) {
       console.error("SVG export error", err);
       triggerToast("SVG Notice", "Could not extract raw canvas vector. Please try again.", "info");
@@ -1589,11 +1655,16 @@ export default function TailorPackStudio() {
 
   // Export 3: Deterministic JSON Tailor Pack Specification
   const handleDownloadJSON = () => {
+    const blockSlug = garmentBlock.replace(/[^a-zA-Z0-9]+/g, "_");
     const spec = {
-      garment: "dress_basic_v1",
+      garment: blockSlug.toLowerCase(),
+      garment_block: garmentBlock,
+      neckline: necklineCut,
+      sleeves: sleeveCut,
       pattern_size: selectedSize,
       hem_cut: hemCut,
       silhouette_fit: silhouetteFit,
+      swatch_hex: detectedColorHex,
       version: versionNumber,
       status: versionStatus,
       timestamp: new Date().toISOString(),
@@ -2137,12 +2208,36 @@ export default function TailorPackStudio() {
                   ))}
                 </div>
 
-                {/* Quick Fastening Override directly in Step 1 - Clean Astra Gray Outline Pills */}
-                <div className="pt-2 border-t border-[#E5E5E5] space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-[#1E1E1E]">Fastening / Closure Type:</span>
-                    <span className="text-[#757575] font-normal">Not all outfits use a zipper</span>
+                {/* Quick Garment Block & Fastening Override directly in Step 1 */}
+                <div className="pt-2 border-t border-[#E5E5E5] space-y-2.5">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-[#1E1E1E]">Pattern Silhouette Block:</span>
+                      <span className="text-[#757575] font-normal">Switches CAD block &amp; seams</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["Sheath Dress", "A-Line Dress", "Slip Dress", "Tailored Blazer", "Button-Down Shirt", "Kaftan / Boubou"] as const).map((blk) => {
+                        const active = garmentBlock === blk;
+                        return (
+                          <button
+                            key={blk}
+                            type="button"
+                            onClick={() => handleGarmentBlockChange(blk)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-all cursor-pointer ${
+                              active ? OPTION_ACTIVE : OPTION_IDLE
+                            }`}>
+                            {blk}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-[#1E1E1E]">Fastening / Closure Type:</span>
+                      <span className="text-[#757575] font-normal">Not all outfits use a zipper</span>
+                    </div>
                   <div className="flex flex-wrap gap-1.5">
                     {[
                       { label: "Back Zip (55cm)", value: "Back Invisible Zipper (55cm)" },
@@ -2164,6 +2259,7 @@ export default function TailorPackStudio() {
                         </button>
                       );
                     })}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -2965,38 +3061,81 @@ export default function TailorPackStudio() {
               const finHip = bodyHip + easeValues.hip;
               const finLength = bodyLength + easeValues.length;
 
-              // Dynamic hem level Y based on garmentBlock and hemCut
+              // Dynamic block flags & hem/silhouette geometry based on garmentBlock and hemCut
               const isBlazer = garmentBlock === "Tailored Blazer";
               const isALine = garmentBlock === "A-Line Dress";
               const isSlip = garmentBlock === "Slip Dress";
+              const isShirt = garmentBlock === "Button-Down Shirt";
+              const isKaftan = garmentBlock === "Kaftan / Boubou";
+              const hasButtonFront = closureChoice === "Front Button Placket" || isShirt || isBlazer;
+              const blockHasDarts = showDarts && !isKaftan && !isShirt;
 
-              const hemY = isBlazer
-                ? 330
+              const hemY = isShirt
+                ? hemCut === "Mini"
+                  ? 295
+                  : hemCut === "Maxi"
+                  ? 380
+                  : 328
+                : isBlazer
+                ? hemCut === "Mini"
+                  ? 310
+                  : hemCut === "Maxi"
+                  ? 385
+                  : 335
+                : isKaftan
+                ? hemCut === "Mini"
+                  ? 385
+                  : hemCut === "Midi"
+                  ? 455
+                  : 515
                 : hemCut === "Mini"
                 ? 375
                 : hemCut === "Maxi"
                 ? 510
                 : 450;
 
-              // Dynamic half-widths scaled around baseline UK 12 (Bust 96, Waist 77, Hip 102.5)
-              const bustHalfW = Math.round(66 + (finBust - 96) * 0.45);
-              const waistHalfW = Math.round((isBlazer ? 54 : 47) + (finWaist - 77) * 0.42);
-              const hipHalfW = Math.round(59 + (finHip - 102.5) * 0.45);
+              // Dynamic half-widths tailored per garment silhouette
+              const bustHalfW = Math.round((isKaftan ? 76 : isShirt ? 68 : 66) + (finBust - 96) * 0.45);
+              const waistHalfW = Math.round(
+                isKaftan
+                  ? bustHalfW + 6
+                  : isShirt
+                  ? bustHalfW - 4
+                  : (isBlazer ? 54 : 47) + (finWaist - 77) * 0.42
+              );
+              const hipHalfW = Math.round(
+                isKaftan
+                  ? bustHalfW + 12
+                  : isShirt
+                  ? bustHalfW + 1
+                  : 59 + (finHip - 102.5) * 0.45
+              );
               const hemHalfW = Math.round(
-                isBlazer
+                isKaftan
+                  ? bustHalfW + 20
+                  : isShirt
+                  ? bustHalfW + 3
+                  : isBlazer
                   ? hipHalfW + 2
                   : isALine
-                  ? hipHalfW + 36
+                  ? hipHalfW + 42
                   : hemCut === "Maxi"
-                  ? hipHalfW + 15
+                  ? hipHalfW + 16
                   : hemCut === "Mini"
-                  ? hipHalfW - 2
-                  : hipHalfW + 6
+                  ? hipHalfW - 4
+                  : hipHalfW + 5
               );
+
+              const shoulderOuterX = isKaftan ? 70 : isBlazer ? 54 : isShirt ? 48 : isSlip ? 26 : 44;
+              const shoulderOuterY = isKaftan ? 58 : isBlazer ? 50 : isShirt ? 52 : isSlip ? 62 : 54;
 
               // Dynamic Neckline Closure Path based on necklineCut & garmentBlock
               const frontNeckClosure = isBlazer
-                ? "L 18 36 L 34 62 L 0 124 L -34 62 L -18 36 L -28 44"
+                ? "L 18 36 L 34 62 L 0 124 L -34 62 L -18 36 L -26 40"
+                : isShirt
+                ? "C 18 70, 8 76, 0 76 C -8 76, -18 70, -28 44"
+                : isKaftan
+                ? "L 10 84 L 0 130 L -10 84 L -30 42"
                 : necklineCut === "Round"
                 ? "Q 0 98 -28 44"
                 : necklineCut === "V-Neck"
@@ -3007,6 +3146,10 @@ export default function TailorPackStudio() {
 
               const frontNeckFacingPath = isBlazer
                 ? "M -36 46 L -38 72 L 0 134 L 38 72 L 36 46"
+                : isShirt
+                ? "M -32 46 Q 0 82 32 46"
+                : isKaftan
+                ? "M -34 46 L -14 90 L 0 140 L 14 90 L 34 46"
                 : necklineCut === "Round"
                 ? "M -34 48 Q 0 112 34 48"
                 : necklineCut === "V-Neck"
@@ -3015,23 +3158,62 @@ export default function TailorPackStudio() {
                 ? "M -34 48 C -20 82, -8 112, 0 120 C 8 112, 20 82, 34 48"
                 : "M -34 48 L -34 98 L 34 98 L 34 48";
 
-              const shoulderLeft = isSlip ? "M -24 32 L -28 62" : isBlazer ? "M -26 40 L -50 52" : "M -28 44 L -44 54";
-              const shoulderRight = isSlip ? "L 28 62 L 24 32" : isBlazer ? "L 50 52 L 26 40" : "L 44 54 L 28 44";
+              const shoulderLeft = isSlip
+                ? `M -24 32 L -${shoulderOuterX} ${shoulderOuterY}`
+                : isKaftan
+                ? `M -30 42 L -${shoulderOuterX} ${shoulderOuterY}`
+                : isBlazer
+                ? `M -26 40 L -${shoulderOuterX} ${shoulderOuterY}`
+                : `M -28 44 L -${shoulderOuterX} ${shoulderOuterY}`;
 
-              // True Cubic-Bezier Anatomical Stitch Paths (Front & Back)
+              const shoulderRight = isSlip
+                ? `L ${shoulderOuterX} ${shoulderOuterY} L 24 32`
+                : isKaftan
+                ? `L ${shoulderOuterX} ${shoulderOuterY} L 30 42`
+                : isBlazer
+                ? `L ${shoulderOuterX} ${shoulderOuterY} L 26 40`
+                : `L ${shoulderOuterX} ${shoulderOuterY} L 28 44`;
+
+              const sideLeftUpper = isKaftan
+                ? `C -${shoulderOuterX} 86, -${bustHalfW + 8} 106, -${bustHalfW} 126 L -${waistHalfW} 220`
+                : isShirt
+                ? `C -${shoulderOuterX - 4} 84, -${bustHalfW - 4} 108, -${bustHalfW} 126 C -${bustHalfW - 1} 165, -${waistHalfW + 2} 195, -${waistHalfW} 220`
+                : `C -40 84, -${bustHalfW - 8} 110, -${bustHalfW} 126 C -${bustHalfW - 2} 164, -${waistHalfW + 3} 195, -${waistHalfW} 220`;
+
+              const sideLeftLower = isKaftan
+                ? `L -${hemHalfW} ${hemY}`
+                : isShirt
+                ? `L -${hemHalfW} ${hemY - 16}`
+                : isALine
+                ? `Q -${hipHalfW + 12} 292 -${hemHalfW} ${hemY}`
+                : `C -${waistHalfW + 4} 252, -${hipHalfW - 2} 280, -${hipHalfW} 312 L -${hemHalfW} ${hemY}`;
+
+              const hemSweep = isShirt
+                ? `Q -${Math.round(hemHalfW * 0.55)} ${hemY + 14} 0 ${hemY + 14} Q ${Math.round(hemHalfW * 0.55)} ${hemY + 14} ${hemHalfW} ${hemY - 16}`
+                : `Q 0 ${hemY + (isALine ? 16 : isKaftan ? 4 : 7)} ${hemHalfW} ${hemY}`;
+
+              const sideRightLower = isKaftan
+                ? `L ${waistHalfW} 220`
+                : isShirt
+                ? `L ${waistHalfW} 220`
+                : isALine
+                ? `Q ${hipHalfW + 12} 292 ${waistHalfW} 220`
+                : `L ${hipHalfW} 312 C ${hipHalfW - 2} 280, ${waistHalfW + 4} 252, ${waistHalfW} 220`;
+
+              const sideRightUpper = isKaftan
+                ? `L ${bustHalfW} 126 C ${bustHalfW + 8} 106, ${shoulderOuterX} 86, ${shoulderOuterX} ${shoulderOuterY}`
+                : isShirt
+                ? `C ${waistHalfW + 2} 195, ${bustHalfW - 1} 165, ${bustHalfW} 126 C ${bustHalfW - 4} 108, ${shoulderOuterX - 4} 84, ${shoulderOuterX} ${shoulderOuterY}`
+                : `C ${waistHalfW + 3} 195, ${bustHalfW - 2} 164, ${bustHalfW} 126 C ${bustHalfW - 8} 110, 40 84, ${shoulderOuterX} ${shoulderOuterY}`;
+
+              // True Cubic-Bezier / Block-Specific Architectural Stitch Paths (Front & Back)
               const frontContourPath = [
                 shoulderLeft,
-                `C -40 84, -${bustHalfW - 8} 110, -${bustHalfW} 126`,
-                `C -${bustHalfW - 2} 164, -${waistHalfW + 3} 195, -${waistHalfW} 220`,
-                isALine
-                  ? `Q -${hipHalfW + 10} 290 -${hemHalfW} ${hemY}`
-                  : `C -${waistHalfW + 4} 252, -${hipHalfW - 2} 280, -${hipHalfW} 312 L -${hemHalfW} ${hemY}`,
-                `Q 0 ${hemY + (isALine ? 14 : 7)} ${hemHalfW} ${hemY}`,
-                isALine
-                  ? `Q ${hipHalfW + 10} 290 ${waistHalfW} 220`
-                  : `L ${hipHalfW} 312 C ${hipHalfW - 2} 280, ${waistHalfW + 4} 252, ${waistHalfW} 220`,
-                `C ${waistHalfW + 3} 195, ${bustHalfW - 2} 164, ${bustHalfW} 126`,
-                `C ${bustHalfW - 8} 110, 40 84, ${isSlip ? "28 62" : isBlazer ? "50 52" : "44 54"}`,
+                sideLeftUpper,
+                sideLeftLower,
+                hemSweep,
+                sideRightLower,
+                sideRightUpper,
                 shoulderRight,
                 frontNeckClosure,
                 `Z`
@@ -3039,19 +3221,13 @@ export default function TailorPackStudio() {
 
               const backContourPath = [
                 shoulderLeft,
-                `C -40 84, -${bustHalfW - 8} 110, -${bustHalfW} 126`,
-                `C -${bustHalfW - 2} 164, -${waistHalfW + 3} 195, -${waistHalfW} 220`,
-                isALine
-                  ? `Q -${hipHalfW + 10} 290 -${hemHalfW} ${hemY}`
-                  : `C -${waistHalfW + 4} 252, -${hipHalfW - 2} 280, -${hipHalfW} 312 L -${hemHalfW} ${hemY}`,
-                `Q 0 ${hemY + (isALine ? 12 : 6)} ${hemHalfW} ${hemY}`,
-                isALine
-                  ? `Q ${hipHalfW + 10} 290 ${waistHalfW} 220`
-                  : `L ${hipHalfW} 312 C ${hipHalfW - 2} 280, ${waistHalfW + 4} 252, ${waistHalfW} 220`,
-                `C ${waistHalfW + 3} 195, ${bustHalfW - 2} 164, ${bustHalfW} 126`,
-                `C ${bustHalfW - 8} 110, 40 84, ${isSlip ? "28 62" : isBlazer ? "50 52" : "44 54"}`,
+                sideLeftUpper,
+                sideLeftLower,
+                hemSweep,
+                sideRightLower,
+                sideRightUpper,
                 shoulderRight,
-                `Q 0 58 -28 44`,
+                isKaftan ? `Q 0 54 -30 42` : isBlazer ? `Q 0 54 -26 40` : isSlip ? `Q 0 58 -24 32` : `Q 0 58 -28 44`,
                 `Z`
               ].join(" ");
 
@@ -3334,8 +3510,12 @@ export default function TailorPackStudio() {
                         <text x="24" y="28" fill="#333333" fontSize="10.5" fontWeight="500" letterSpacing="1.1">
                           ASTRA PATTERN SHEET // {garmentBlock.toUpperCase()} ({necklineCut.toUpperCase()} · {sleeveCut.toUpperCase()}) // SCALE 1:10
                         </text>
+                        <rect x="645" y="16" width="12" height="12" rx="3" fill={detectedColorHex} stroke="#bdbdbd" strokeWidth="1" />
+                        <text x="663" y="26" fill="#4f4f4f" fontSize="9.5" fontWeight="500">
+                          {detectedColorHex}
+                        </text>
                         <text x="896" y="28" fill="#757575" fontSize="10" fontWeight="500" textAnchor="end">
-                          SIZE: {selectedSize} ({silhouetteFit.toUpperCase()}) · VERSION v{versionNumber}.0
+                          SIZE: {selectedSize} ({silhouetteFit.toUpperCase()}) · v{versionNumber}.0
                         </text>
 
                         {/* Center Divider Line */}
@@ -3377,6 +3557,8 @@ export default function TailorPackStudio() {
                               strokeWidth={inspectedLayer === "silhouette" ? "3" : "2.1"}
                               strokeLinejoin="round"
                             />
+                            {/* Subtle Cloth Swatch Tint Inside Garment Silhouette */}
+                            <path d={frontContourPath} fill={detectedColorHex} fillOpacity="0.055" pointerEvents="none" />
                             {/* Pattern Cutter Seam Notches (T-ticks at Bust, Waist, Hip) */}
                             <line x1={-bustHalfW - 4} y1="126" x2={-bustHalfW + 3} y2="126" stroke="#4f4f4f" strokeWidth="1.6" />
                             <line x1={bustHalfW - 3} y1="126" x2={bustHalfW + 4} y2="126" stroke="#4f4f4f" strokeWidth="1.6" />
@@ -3407,61 +3589,110 @@ export default function TailorPackStudio() {
                             {/* Block-Specific CAD Details */}
                             {isBlazer && (
                               <>
-                                {/* Notched Lapel Roll Lines & Front Button Placket */}
+                                {/* Notched Lapel Roll Lines, Princess Contour Seams & Front 2-Button Overlap */}
                                 <path d="M -26 40 L 0 124 L 26 40" fill="none" stroke="#4f4f4f" strokeWidth="1.4" strokeDasharray="4 2" />
-                                <line x1="0" y1="124" x2="0" y2={hemY} stroke="#4f4f4f" strokeWidth="1.6" />
-                                <circle cx="0" cy="175" r="3.5" fill="#4f4f4f" />
-                                <circle cx="0" cy="225" r="3.5" fill="#4f4f4f" />
-                                {/* Hip Welt Pockets */}
-                                <rect x="-46" y="258" width="28" height="6" rx="1" fill="#ffffff" stroke="#4f4f4f" strokeWidth="1.3" />
-                                <rect x="18" y="258" width="28" height="6" rx="1" fill="#ffffff" stroke="#4f4f4f" strokeWidth="1.3" />
+                                <path d="M -22 68 Q -28 165 -26 290" fill="none" stroke="#757575" strokeWidth="1.1" strokeDasharray="3 2" />
+                                <path d="M 22 68 Q 28 165 26 290" fill="none" stroke="#757575" strokeWidth="1.1" strokeDasharray="3 2" />
+                                <rect x="-46" y="252" width="30" height="8" rx="1" fill="#ffffff" stroke="#4f4f4f" strokeWidth="1.3" />
+                                <rect x="16" y="252" width="30" height="8" rx="1" fill="#ffffff" stroke="#4f4f4f" strokeWidth="1.3" />
+                              </>
+                            )}
+                            {isShirt && (
+                              <>
+                                {/* Two-Piece Collar & Yoke Seam */}
+                                <path d="M -28 44 L -34 26 L 0 38 L 34 26 L 28 44" fill="#ffffff" stroke="#333333" strokeWidth="1.5" strokeLinejoin="round" />
+                                <line x1={-shoulderOuterX + 2} y1="78" x2={shoulderOuterX - 2} y2="78" stroke="#4f4f4f" strokeWidth="1.2" strokeDasharray="4 2" />
+                                {/* Left Chest Patch Pocket */}
+                                <path d="M 18 128 L 46 128 L 46 158 L 32 165 L 18 158 Z" fill="#ffffff" stroke="#4f4f4f" strokeWidth="1.3" />
+                              </>
+                            )}
+                            {isKaftan && (
+                              <>
+                                {/* Embroidered Neck Placket & Relaxed Kimono Hem Side Slits */}
+                                <rect x="-12" y="84" width="24" height="78" rx="4" fill="rgba(79,79,79,0.04)" stroke="#4f4f4f" strokeWidth="1.2" strokeDasharray="3 2" />
+                                <line x1={-hemHalfW} y1={hemY - 58} x2={-hemHalfW + 8} y2={hemY - 58} stroke="#333333" strokeWidth="1.6" />
+                                <line x1={hemHalfW - 8} y1={hemY - 58} x2={hemHalfW} y2={hemY - 58} stroke="#333333" strokeWidth="1.6" />
                               </>
                             )}
                             {isALine && (
                               <>
                                 {/* A-Line Skirt Flare Slash Lines */}
-                                <line x1="-24" y1="220" x2={-hemHalfW + 18} y2={hemY} stroke="#757575" strokeWidth="1" strokeDasharray="5 3" />
-                                <line x1="24" y1="220" x2={hemHalfW - 18} y2={hemY} stroke="#757575" strokeWidth="1" strokeDasharray="5 3" />
+                                <line x1="-22" y1="215" x2={-hemHalfW + 18} y2={hemY} stroke="#757575" strokeWidth="1.1" strokeDasharray="5 3" />
+                                <line x1="22" y1="215" x2={hemHalfW - 18} y2={hemY} stroke="#757575" strokeWidth="1.1" strokeDasharray="5 3" />
                               </>
                             )}
                             {isSlip && (
                               <>
                                 {/* Delicate Spaghetti Straps */}
-                                <line x1="-24" y1="20" x2="-24" y2="54" stroke="#333333" strokeWidth="2.1" />
-                                <line x1="24" y1="20" x2="24" y2="54" stroke="#333333" strokeWidth="2.1" />
+                                <line x1="-24" y1="18" x2="-24" y2="54" stroke="#333333" strokeWidth="2.1" />
+                                <line x1="24" y1="18" x2="24" y2="54" stroke="#333333" strokeWidth="2.1" />
                               </>
                             )}
                           </g>
 
-                          {/* Internal Construction Axes & Grainline */}
+                          {/* Internal Construction Axes, Center-Front Placket/Fold & Grainline */}
                           <g opacity={inspectedLayer === "all" || inspectedLayer === "silhouette" ? 1 : 0.25}>
-                            {/* Center Front Fold Line */}
-                            <line x1="0" y1="90" x2="0" y2={hemY + 3} stroke="#757575" strokeDasharray="8 3 2 3" strokeWidth="1" />
-                            <text x="4" y="108" fill="#4f4f4f" fontSize="8.5" fontWeight="500">CF FOLD</text>
+                            {hasButtonFront ? (
+                              <>
+                                {/* Center-Front Button Placket & Evenly Spaced Buttonholes */}
+                                <rect x="-8" y={isShirt ? 76 : 124} width="16" height={Math.max(40, hemY - (isShirt ? 88 : 136))} fill="rgba(79,79,79,0.03)" stroke="#4f4f4f" strokeWidth="1.1" />
+                                <line x1="0" y1={isShirt ? 76 : 124} x2="0" y2={hemY} stroke="#757575" strokeDasharray="4 2" strokeWidth="1" />
+                                {(isBlazer ? [168, 224] : [102, 144, 186, 228, 270]).map((by) =>
+                                  by < hemY - 12 ? (
+                                    <g key={by}>
+                                      <circle cx="0" cy={by} r="3.2" fill="#ffffff" stroke="#333333" strokeWidth="1.3" />
+                                      <line x1="-4" y1={by} x2="4" y2={by} stroke="#4f4f4f" strokeWidth="0.9" />
+                                    </g>
+                                  ) : null
+                                )}
+                                <text x="12" y={isShirt ? 96 : 144} fill="#4f4f4f" fontSize="8" fontWeight="500">CF PLACKET</text>
+                              </>
+                            ) : (
+                              <>
+                                {/* Center Front Fold Line */}
+                                <line x1="0" y1="90" x2="0" y2={hemY + 3} stroke="#757575" strokeDasharray="8 3 2 3" strokeWidth="1" />
+                                <text x="4" y="108" fill="#4f4f4f" fontSize="8.5" fontWeight="500">CF FOLD</text>
+                              </>
+                            )}
 
                             {/* Horizontal Anatomical Balance Lines */}
                             <line x1={-bustHalfW} y1="126" x2={bustHalfW} y2="126" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
                             <line x1={-waistHalfW} y1="220" x2={waistHalfW} y2="220" stroke="#757575" strokeDasharray="4 3" strokeWidth="1.2" />
-                            <line x1={-hipHalfW} y1="312" x2={hipHalfW} y2="312" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
+                            {hemY > 335 && (
+                              <line x1={-hipHalfW} y1="312" x2={hipHalfW} y2="312" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
+                            )}
 
-                            {/* Vertical Grainline Vector */}
-                            <line x1="-38" y1="155" x2="-38" y2={hemY - 45} stroke="#4f4f4f" strokeWidth="1.2" />
-                            <polygon points="-38,148 -41.5,157 -34.5,157" fill="#4f4f4f" />
-                            <polygon points={`-38,${hemY - 38} -41.5,${hemY - 47} -34.5,${hemY - 47}`} fill="#4f4f4f" />
-                            <text
-                              x="-43"
-                              y={(155 + hemY - 45) / 2}
-                              fill="#4f4f4f"
-                              fontSize="8.5"
-                              fontWeight="500"
-                              textAnchor="middle"
-                              transform={`rotate(-90 -43 ${(155 + hemY - 45) / 2})`}>
-                              GRAINLINE // SELVEDGE
-                            </text>
+                            {/* Grainline Vector (45deg Bias for Slip Dress, Straight Grain otherwise) */}
+                            {isSlip ? (
+                              <g>
+                                <line x1="-48" y1="185" x2="22" y2="255" stroke="#4f4f4f" strokeWidth="1.2" />
+                                <polygon points="-48,185 -40,187 -46,193" fill="#4f4f4f" />
+                                <polygon points="22,255 14,253 20,247" fill="#4f4f4f" />
+                                <text x="-12" y="212" fill="#4f4f4f" fontSize="8" fontWeight="500" textAnchor="middle" transform="rotate(45 -12 212)">
+                                  45° BIAS GRAIN
+                                </text>
+                              </g>
+                            ) : (
+                              <g>
+                                <line x1="-40" y1="155" x2="-40" y2={hemY - 40} stroke="#4f4f4f" strokeWidth="1.2" />
+                                <polygon points="-40,148 -43.5,157 -36.5,157" fill="#4f4f4f" />
+                                <polygon points={`-40,${hemY - 33} -43.5,${hemY - 42} -36.5,${hemY - 42}`} fill="#4f4f4f" />
+                                <text
+                                  x="-45"
+                                  y={(155 + hemY - 40) / 2}
+                                  fill="#4f4f4f"
+                                  fontSize="8.5"
+                                  fontWeight="500"
+                                  textAnchor="middle"
+                                  transform={`rotate(-90 -45 ${(155 + hemY - 40) / 2})`}>
+                                  GRAINLINE // SELVEDGE
+                                </text>
+                              </g>
+                            )}
                           </g>
 
-                          {/* Front Bust Darts, Apex Targets & Diamond Waist Suppression Darts */}
-                          {showDarts && (
+                          {/* Front Bust Darts, Apex Targets & Diamond Waist Suppression Darts (Omitted for Unstructured Kaftan/Shirt) */}
+                          {blockHasDarts && (
                             <g
                               opacity={getLayerOpacity("darts")}
                               style={{ transition: "opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)" }}
@@ -3490,40 +3721,52 @@ export default function TailorPackStudio() {
                                 strokeWidth={inspectedLayer === "darts" ? "1.8" : "1.2"}
                               />
 
-                              {/* Diamond Waist Suppression Darts */}
-                              <path
-                                d="M -24 152 L -18.5 220 L -24 282 L -29.5 220 Z"
-                                fill={inspectedLayer === "darts" ? "rgba(79,79,79,0.16)" : "rgba(79,79,79,0.06)"}
-                                stroke="#4f4f4f"
-                                strokeWidth={inspectedLayer === "darts" ? "2" : "1.3"}
-                              />
-                              <line x1="-24" y1="152" x2="-24" y2="282" stroke="#757575" strokeWidth="0.8" strokeDasharray="2 2" />
+                              {/* Diamond Waist Suppression Darts (Omitted on Bias Slip Dress) */}
+                              {!isSlip && (
+                                <>
+                                  <path
+                                    d="M -24 152 L -18.5 220 L -24 282 L -29.5 220 Z"
+                                    fill={inspectedLayer === "darts" ? "rgba(79,79,79,0.16)" : "rgba(79,79,79,0.06)"}
+                                    stroke="#4f4f4f"
+                                    strokeWidth={inspectedLayer === "darts" ? "2" : "1.3"}
+                                  />
+                                  <line x1="-24" y1="152" x2="-24" y2="282" stroke="#757575" strokeWidth="0.8" strokeDasharray="2 2" />
 
-                              <path
-                                d="M 24 152 L 29.5 220 L 24 282 L 18.5 220 Z"
-                                fill={inspectedLayer === "darts" ? "rgba(79,79,79,0.16)" : "rgba(79,79,79,0.06)"}
-                                stroke="#4f4f4f"
-                                strokeWidth={inspectedLayer === "darts" ? "2" : "1.3"}
-                              />
-                              <line x1="24" y1="152" x2="24" y2="282" stroke="#757575" strokeWidth="0.8" strokeDasharray="2 2" />
+                                  <path
+                                    d="M 24 152 L 29.5 220 L 24 282 L 18.5 220 Z"
+                                    fill={inspectedLayer === "darts" ? "rgba(79,79,79,0.16)" : "rgba(79,79,79,0.06)"}
+                                    stroke="#4f4f4f"
+                                    strokeWidth={inspectedLayer === "darts" ? "2" : "1.3"}
+                                  />
+                                  <line x1="24" y1="152" x2="24" y2="282" stroke="#757575" strokeWidth="0.8" strokeDasharray="2 2" />
+                                </>
+                              )}
                             </g>
                           )}
 
-                          {/* Curved Hemline & 4.0cm Blind Hem Turn-Up */}
+                          {/* Curved Hemline & Hem Turn-Up */}
                           <g
                             opacity={getLayerOpacity("hem")}
                             style={{ transition: "opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)" }}
                             onClick={() => setInspectedLayer(inspectedLayer === "hem" ? "all" : "hem")}
                             className="cursor-pointer">
                             <path
-                              d={`M -${hemHalfW} ${hemY} Q 0 ${hemY + 7} ${hemHalfW} ${hemY}`}
+                              d={
+                                isShirt
+                                  ? `M -${hemHalfW} ${hemY - 16} Q -${Math.round(hemHalfW * 0.55)} ${hemY + 14} 0 ${hemY + 14} Q ${Math.round(hemHalfW * 0.55)} ${hemY + 14} ${hemHalfW} ${hemY - 16}`
+                                  : `M -${hemHalfW} ${hemY} Q 0 ${hemY + (isALine ? 16 : isKaftan ? 4 : 7)} ${hemHalfW} ${hemY}`
+                              }
                               fill="none"
                               stroke="#333333"
                               strokeWidth={inspectedLayer === "hem" ? "3" : "2.1"}
                             />
                             {/* Hem Allowance Fold Line */}
                             <path
-                              d={`M -${hemHalfW - 1} ${hemY - 16} Q 0 ${hemY - 9} ${hemHalfW - 1} ${hemY - 16}`}
+                              d={
+                                isShirt
+                                  ? `M -${hemHalfW - 2} ${hemY - 26} Q 0 ${hemY + 2} ${hemHalfW - 2} ${hemY - 26}`
+                                  : `M -${hemHalfW - 1} ${hemY - 16} Q 0 ${hemY - 9} ${hemHalfW - 1} ${hemY - 16}`
+                              }
                               fill="none"
                               stroke="#757575"
                               strokeDasharray="4 3"
@@ -3611,6 +3854,7 @@ export default function TailorPackStudio() {
                               strokeWidth={inspectedLayer === "silhouette" ? "3" : "2.1"}
                               strokeLinejoin="round"
                             />
+                            <path d={backContourPath} fill={detectedColorHex} fillOpacity="0.055" pointerEvents="none" />
                             {/* Back Seam Notches */}
                             <line x1={-bustHalfW - 4} y1="126" x2={-bustHalfW + 3} y2="126" stroke="#4f4f4f" strokeWidth="1.6" />
                             <line x1={bustHalfW - 3} y1="126" x2={bustHalfW + 4} y2="126" stroke="#4f4f4f" strokeWidth="1.6" />
@@ -3618,7 +3862,7 @@ export default function TailorPackStudio() {
                             <line x1={waistHalfW - 3} y1="220" x2={waistHalfW + 4} y2="220" stroke="#4f4f4f" strokeWidth="1.6" />
                           </g>
 
-                          {/* Back Neckline Facing & Double Armscye Notches */}
+                          {/* Back Neckline Facing, Shirt Yoke & Double Armscye Notches */}
                           <g
                             opacity={getLayerOpacity("seams")}
                             style={{ transition: "opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)" }}
@@ -3631,6 +3875,21 @@ export default function TailorPackStudio() {
                               strokeDasharray="3 2"
                               strokeWidth={inspectedLayer === "seams" ? "1.8" : "1.1"}
                             />
+                            {isShirt && (
+                              <>
+                                {/* Back Shirt Yoke + Box Pleat */}
+                                <line x1={-shoulderOuterX + 2} y1="84" x2={shoulderOuterX - 2} y2="84" stroke="#4f4f4f" strokeWidth="1.4" />
+                                <rect x="-12" y="84" width="24" height="24" fill="rgba(79,79,79,0.05)" stroke="#757575" strokeWidth="1" strokeDasharray="3 2" />
+                              </>
+                            )}
+                            {isBlazer && (
+                              <>
+                                {/* Center-Back Coat Vent & Princess Seams */}
+                                <path d="M -22 68 Q -28 165 -26 290" fill="none" stroke="#757575" strokeWidth="1.1" strokeDasharray="3 2" />
+                                <path d="M 22 68 Q 28 165 26 290" fill="none" stroke="#757575" strokeWidth="1.1" strokeDasharray="3 2" />
+                                <rect x="-4" y={hemY - 56} width="8" height="56" fill="rgba(79,79,79,0.06)" stroke="#4f4f4f" strokeWidth="1.1" />
+                              </>
+                            )}
                             {/* Double Armscye Notches (Standard Back Pattern Indicator) */}
                             <line x1="-43" y1="85" x2="-37" y2="87" stroke="#4f4f4f" strokeWidth="1.5" />
                             <line x1="-44" y1="90" x2="-38" y2="92" stroke="#4f4f4f" strokeWidth="1.5" />
@@ -3642,7 +3901,9 @@ export default function TailorPackStudio() {
                           <g opacity={inspectedLayer === "all" || inspectedLayer === "silhouette" ? 1 : 0.25}>
                             <line x1={-bustHalfW} y1="126" x2={bustHalfW} y2="126" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
                             <line x1={-waistHalfW} y1="220" x2={waistHalfW} y2="220" stroke="#757575" strokeDasharray="4 3" strokeWidth="1.2" />
-                            <line x1={-hipHalfW} y1="312" x2={hipHalfW} y2="312" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
+                            {hemY > 335 && (
+                              <line x1={-hipHalfW} y1="312" x2={hipHalfW} y2="312" stroke="#bdbdbd" strokeDasharray="3 3" strokeWidth="1" />
+                            )}
                           </g>
 
                           {/* Center-Back Seam & Dynamic Fastening / Zipper / Fold Line */}
@@ -3725,8 +3986,8 @@ export default function TailorPackStudio() {
                             </g>
                           )}
 
-                          {/* Back Diamond Waist Darts */}
-                          {showDarts && (
+                          {/* Back Diamond Waist Darts (Omitted for Unstructured Kaftan/Shirt & Slip) */}
+                          {blockHasDarts && !isSlip && (
                             <g
                               opacity={getLayerOpacity("darts")}
                               style={{ transition: "opacity 240ms cubic-bezier(0.22, 1, 0.36, 1)" }}
@@ -3757,13 +4018,21 @@ export default function TailorPackStudio() {
                             onClick={() => setInspectedLayer(inspectedLayer === "hem" ? "all" : "hem")}
                             className="cursor-pointer">
                             <path
-                              d={`M -${hemHalfW} ${hemY} Q 0 ${hemY + 6} ${hemHalfW} ${hemY}`}
+                              d={
+                                isShirt
+                                  ? `M -${hemHalfW} ${hemY - 16} Q -${Math.round(hemHalfW * 0.55)} ${hemY + 14} 0 ${hemY + 14} Q ${Math.round(hemHalfW * 0.55)} ${hemY + 14} ${hemHalfW} ${hemY - 16}`
+                                  : `M -${hemHalfW} ${hemY} Q 0 ${hemY + (isALine ? 14 : isKaftan ? 4 : 6)} ${hemHalfW} ${hemY}`
+                              }
                               fill="none"
                               stroke="#333333"
                               strokeWidth={inspectedLayer === "hem" ? "3" : "2.1"}
                             />
                             <path
-                              d={`M -${hemHalfW - 1} ${hemY - 16} Q 0 ${hemY - 10} ${hemHalfW - 1} ${hemY - 16}`}
+                              d={
+                                isShirt
+                                  ? `M -${hemHalfW - 2} ${hemY - 26} Q 0 ${hemY + 2} ${hemHalfW - 2} ${hemY - 26}`
+                                  : `M -${hemHalfW - 1} ${hemY - 16} Q 0 ${hemY - 10} ${hemHalfW - 1} ${hemY - 16}`
+                              }
                               fill="none"
                               stroke="#757575"
                               strokeDasharray="4 3"
@@ -3772,20 +4041,32 @@ export default function TailorPackStudio() {
                           </g>
                         </motion.g>
 
-                        {/* ===== SLEEVE PATTERN PIECE (Dynamic when Short or Long Sleeve is selected) ===== */}
+                        {/* ===== SLEEVE PATTERN PIECE (Dynamic Block-Aware Cut when Short or Long Sleeve is selected) ===== */}
                         {sleeveCut !== "Sleeveless" && (
                           <g
                             transform="translate(460, 345)"
                             onClick={() => setInspectedLayer(inspectedLayer === "seams" ? "all" : "seams")}
                             className="cursor-pointer">
-                            <rect x="-78" y="-24" width="156" height="19" rx="9" fill="#f2f2f2" stroke="#e0e0e0" strokeWidth="1" />
+                            <rect x="-86" y="-24" width="172" height="19" rx="9" fill="#f2f2f2" stroke="#e0e0e0" strokeWidth="1" />
                             <text x="0" y="-11" fill="#333333" fontSize="9" textAnchor="middle" fontWeight="500" letterSpacing="0.7">
-                              {sleeveCut.toUpperCase()} SLEEVE (CUT 2)
+                              {isKaftan
+                                ? `KIMONO ${sleeveCut.toUpperCase()} SLEEVE (CUT 2)`
+                                : isShirt
+                                ? `CUFFED ${sleeveCut.toUpperCase()} SLEEVE (CUT 2)`
+                                : `${sleeveCut.toUpperCase()} SLEEVE (CUT 2)`}
                             </text>
                             {(() => {
                               const slvLenY = sleeveCut === "Long" ? 185 : 88;
-                              const slvWristW = sleeveCut === "Long" ? 30 : 42;
-                              const slvPath = `M -48 34 C -36 4, -18 -2, 0 -2 C 18 -2, 36 4, 48 34 L ${slvWristW} ${slvLenY} L -${slvWristW} ${slvLenY} Z`;
+                              const slvWristW = isKaftan
+                                ? 56
+                                : sleeveCut === "Long"
+                                ? isBlazer
+                                  ? 33
+                                  : 28
+                                : 42;
+                              const slvPath = isKaftan
+                                ? `M -54 22 L 54 22 L ${slvWristW} ${slvLenY} L -${slvWristW} ${slvLenY} Z`
+                                : `M -48 34 C -36 4, -18 -2, 0 -2 C 18 -2, 36 4, 48 34 L ${slvWristW} ${slvLenY} L -${slvWristW} ${slvLenY} Z`;
                               return (
                                 <>
                                   <path
@@ -3803,10 +4084,23 @@ export default function TailorPackStudio() {
                                     strokeWidth="2.0"
                                     strokeLinejoin="round"
                                   />
+                                  <path d={slvPath} fill={detectedColorHex} fillOpacity="0.055" pointerEvents="none" />
                                   {/* Bicep Line & Grainline */}
                                   <line x1="-46" y1="34" x2="46" y2="34" stroke="#bdbdbd" strokeWidth="0.9" strokeDasharray="3 2" />
                                   <line x1="0" y1="6" x2="0" y2={slvLenY - 8} stroke="#4f4f4f" strokeWidth="1" />
-                                  <line x1={-slvWristW + 1} y1={slvLenY - 10} x2={slvWristW - 1} y2={slvLenY - 10} stroke="#757575" strokeWidth="1" strokeDasharray="3 2" />
+                                  <line x1={-slvWristW + 1} y1={slvLenY - (isShirt && sleeveCut === "Long" ? 20 : 10)} x2={slvWristW - 1} y2={slvLenY - (isShirt && sleeveCut === "Long" ? 20 : 10)} stroke="#757575" strokeWidth="1" strokeDasharray="3 2" />
+                                  {/* Shirt Cuff Button or Blazer 2-Piece Cuff Vent */}
+                                  {isShirt && sleeveCut === "Long" && (
+                                    <circle cx="0" cy={slvLenY - 10} r="2.8" fill="#ffffff" stroke="#333333" strokeWidth="1.2" />
+                                  )}
+                                  {isBlazer && sleeveCut === "Long" && (
+                                    <g>
+                                      <line x1="12" y1="34" x2="8" y2={slvLenY} stroke="#757575" strokeWidth="0.9" strokeDasharray="3 2" />
+                                      <circle cx="20" cy={slvLenY - 26} r="2" fill="#4f4f4f" />
+                                      <circle cx="20" cy={slvLenY - 18} r="2" fill="#4f4f4f" />
+                                      <circle cx="20" cy={slvLenY - 10} r="2" fill="#4f4f4f" />
+                                    </g>
+                                  )}
                                   {/* Shoulder Crown & Front/Back Pitch Notches */}
                                   <line x1="0" y1="-6" x2="0" y2="3" stroke="#4f4f4f" strokeWidth="1.5" />
                                   <line x1="-28" y1="10" x2="-23" y2="15" stroke="#4f4f4f" strokeWidth="1.5" />
@@ -3894,144 +4188,186 @@ export default function TailorPackStudio() {
                     <div className="p-4 rounded-2xl bg-white border border-[#E0E0E0] hover:border-[#BDBDBD] transition-all">
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="w-2 h-2 rounded-full bg-[#757575]" />
-                        <h4 className="text-xs font-medium text-[#1E1E1E]">3. Bust &amp; Waist Darts</h4>
+                        <h4 className="text-xs font-medium text-[#1E1E1E]">
+                          {isKaftan
+                            ? "3. Relaxed Drape & Side Slits"
+                            : isShirt
+                            ? "3. Shoulder Yoke & Placket"
+                            : isBlazer
+                            ? "3. Lapel & Princess Seams"
+                            : "3. Bust & Waist Shaping"}
+                        </h4>
                       </div>
                       <p className="text-xs text-[#4F4F4F] font-normal leading-relaxed">
-                        Front bust darts and waist shaping darts contour the fabric smoothly around the chest and waist.
+                        {isKaftan
+                          ? "Relaxed drop-shoulder drape cut with zero waist darts and open lower side-seam walking slits."
+                          : isShirt
+                          ? "Two-piece collar stand, horizontal front/back shoulder yoke, left chest pocket, and 6-button placket."
+                          : isBlazer
+                          ? "Notched lapel roll line, tailored princess panel seams, hip welt pockets, and center-back coat vent."
+                          : isSlip
+                          ? "45° bias grainline orientation with subtle side bust darts for fluid drape without waist bulk."
+                          : "Front bust darts and waist shaping darts contour the fabric smoothly around the chest and waist."}
                       </p>
                       <div className="mt-2.5 pt-2 border-t border-[#F2F2F2] font-mono text-[11px] text-[#4F4F4F] font-medium">
-                        Waist intake: 2.5cm F / 3.0cm B
+                        {isKaftan
+                          ? "Zero waist darts · Relaxed cut"
+                          : isShirt
+                          ? "Yoke seam + CF button placket"
+                          : isBlazer
+                          ? "Princess seams + welt pockets"
+                          : isSlip
+                          ? "45° Bias grain + bust darts"
+                          : "Waist intake: 2.5cm F / 3.0cm B"}
                       </div>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-white border border-[#E0E0E0] hover:border-[#BDBDBD] transition-all">
                       <div className="flex items-center gap-2 mb-1.5">
                         <span className="w-2 h-2 rounded-full bg-[#757575]" />
-                        <h4 className="text-xs font-medium text-[#1E1E1E]">4. Hemline &amp; Fold</h4>
+                        <h4 className="text-xs font-medium text-[#1E1E1E]">4. Hemline &amp; Sweep</h4>
                       </div>
                       <p className="text-xs text-[#4F4F4F] font-normal leading-relaxed">
-                        Finished dress length of {finLength.toFixed(1)} cm ({hemCut} cut) with an extra 4.0 cm fold at the bottom for hemming.
+                        {isShirt
+                          ? `Curved shirttail hem (${finLength.toFixed(1)} cm length) with clean 2.0 cm double-turn narrow hem.`
+                          : `Finished ${garmentBlock.toLowerCase()} length of ${finLength.toFixed(1)} cm (${hemCut} cut) with 4.0 cm bottom hem allowance.`}
                       </p>
                       <div className="mt-2.5 pt-2 border-t border-[#F2F2F2] font-mono text-[11px] text-[#4F4F4F] font-medium">
-                        Bottom hem fold: 4.0 cm
+                        {isShirt ? "Curved shirttail · 2.0 cm turn" : `Hem sweep: ${(hemHalfW * 4).toFixed(0)} cm`}
                       </div>
                     </div>
                   </div>
 
-                  {/* QUICK TAILOR SUMMARY & SEAM ALLOWANCES TABLE (Mobile Cards + Desktop Table) */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-3.5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <RiRuler2Line className="w-4 h-4 text-[#757575]" />
-                        <h4 className="text-xs font-medium text-[#1E1E1E] uppercase tracking-wider">
-                          Pattern Piece Summary &amp; Seam Allowances
-                        </h4>
-                      </div>
-                      <span className="text-xs text-[#4F4F4F] font-normal">
-                        Size: <strong className="text-[#1E1E1E] font-medium">{selectedSize}</strong> ({silhouetteFit})
-                      </span>
-                    </div>
+                  {/* QUICK TAILOR SUMMARY & SEAM ALLOWANCES TABLE (Shared Rows -> Mobile Cards + Desktop Table) */}
+                  {(() => {
+                    const summaryRows = [
+                      {
+                        area: isBlazer ? "Collar & Notched Lapel" : isShirt ? "Two-Piece Shirt Collar" : `Front Neckline (${necklineCut})`,
+                        spec: isBlazer
+                          ? "8.5 cm lapel width · 2-btn break"
+                          : isShirt
+                          ? "40 cm collar stand · Yoke seam"
+                          : isKaftan
+                          ? "V-slit embroidered neck placket"
+                          : `${necklineCut} neck · 11.2 cm half-width`,
+                        allowance: isShirt || isBlazer ? "1.0 cm collar seam" : "1.0 cm + 4.5 cm facing",
+                        note: isBlazer
+                          ? "Pad-stitch or fuse canvas through lapel roll line before turning."
+                          : isShirt
+                          ? "Stay-stitch neck curve and sandwich collar stand cleanly to yoke."
+                          : isKaftan
+                          ? "Bind or face center slit before stitching side drape seams."
+                          : `Reinforce ${necklineCut.toLowerCase()} neckline corners with fusible stay-tape.`
+                      },
+                      {
+                        area: sleeveCut === "Sleeveless" ? "Armholes" : `${sleeveCut} Sleeve & Armhole`,
+                        spec: isKaftan
+                          ? "Extended kimono drape drop-armhole"
+                          : sleeveCut === "Sleeveless"
+                          ? "21.0 cm depth · Sleeveless"
+                          : isShirt && sleeveCut === "Long"
+                          ? "Long shirt sleeve + 6.5 cm cuff"
+                          : `${sleeveCut} set-in sleeve (Cut 2)`,
+                        allowance: "1.0 cm armhole seam",
+                        note: "Match single notch on front armhole and double notch on back armhole."
+                      },
+                      {
+                        area: isKaftan || isShirt ? "Cut Silhouette & Grain" : "Shaping & Darts",
+                        spec: isKaftan
+                          ? "Drop shoulder · Zero darts"
+                          : isShirt
+                          ? "Back box pleat + chest pocket"
+                          : isBlazer
+                          ? "Front & back princess panels"
+                          : isSlip
+                          ? "45° Bias grain · Side bust darts"
+                          : "2.5 cm front · 3.0 cm back darts",
+                        allowance: isKaftan ? "Cut on straight grain" : isSlip ? "Cut at 45° true bias" : "Press toward center",
+                        note: isKaftan
+                          ? "Keep garment hanging loosely without inward waist dart intake."
+                          : isShirt
+                          ? "Fold 2.5 cm box pleat at center back yoke seam before topstitching."
+                          : isSlip
+                          ? "Let cut bias pieces hang 24h before leveling the hemline."
+                          : "Stop side bust dart 2.5 cm before the apex drill target."
+                      },
+                      {
+                        area: "Fastening / Closure",
+                        spec: closureChoice,
+                        allowance: closureChoice.includes("No Zipper") ? "Cut on fold" : "1.5 cm seam",
+                        note: closureChoice.includes("Front Button")
+                          ? "Fuse 3.0 cm front placket interfacing and mark buttonholes vertically."
+                          : closureChoice.includes("No Zipper")
+                          ? "Align Center Back mark directly with folded fabric edge."
+                          : "Press fusible stay-tape along the opening edges before sewing."
+                      },
+                      {
+                        area: "Bottom Hemline",
+                        spec: `${finLength.toFixed(1)} cm length · ${(hemHalfW * 4).toFixed(0)} cm sweep`,
+                        allowance: isShirt ? "2.0 cm narrow turn" : "4.0 cm hem fold",
+                        note: isShirt
+                          ? "Ease curved shirttail corners with basting thread and double-turn 1 cm."
+                          : isKaftan
+                          ? "Leave lower 25 cm side-seam walking slits open and topstitch corners."
+                          : "Turn up 4.0 cm at the bottom and finish with a clean blind hem."
+                      }
+                    ];
 
-                    {/* Mobile Spec Cards */}
-                    <div className="sm:hidden space-y-2.5 text-xs">
-                      {[
-                        {
-                          area: "Front Neckline",
-                          spec: "4.5 cm drop · 11.2 cm half-width",
-                          allowance: "1.0 cm + 4.5 cm facing",
-                          note: "Reinforce square neckline corners with fusible stay-tape."
-                        },
-                        {
-                          area: "Armholes",
-                          spec: "21.0 cm depth",
-                          allowance: "1.0 cm seam",
-                          note: "Single notch on front armhole, double notch on back armhole."
-                        },
-                        {
-                          area: "Bust & Waist Darts",
-                          spec: "2.5 cm front · 3.0 cm back",
-                          allowance: "Press toward center",
-                          note: "Stop side bust dart 2.5 cm before the apex drill target."
-                        },
-                        {
-                          area: "Fastening / Closure",
-                          spec: closureChoice,
-                          allowance: closureChoice.includes("No Zipper") ? "Cut on fold" : "1.5 cm seam",
-                          note: closureChoice.includes("No Zipper")
-                            ? "Align Center Back mark directly with folded fabric edge."
-                            : "Press fusible stay-tape along the opening edges before sewing."
-                        },
-                        {
-                          area: "Bottom Hemline",
-                          spec: `${finLength.toFixed(1)} cm length · ${(hemHalfW * 4).toFixed(0)} cm sweep`,
-                          allowance: "4.0 cm hem fold",
-                          note: "Turn up 4.0 cm at the bottom and finish with a clean blind hem."
-                        }
-                      ].map((row) => (
-                        <div key={row.area} className="p-3 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] space-y-1.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-[#1E1E1E]">{row.area}</span>
-                            <span className="px-2 py-0.5 rounded-full bg-white border border-[#E0E0E0] font-mono text-[10px] text-[#4F4F4F]">
-                              {row.allowance}
-                            </span>
+                    return (
+                      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-3.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-2">
+                            <RiRuler2Line className="w-4 h-4 text-[#757575]" />
+                            <h4 className="text-xs font-medium text-[#1E1E1E] uppercase tracking-wider">
+                              Pattern Piece Summary &amp; Seam Allowances ({garmentBlock})
+                            </h4>
                           </div>
-                          <div className="font-mono text-[11px] font-medium text-[#1E1E1E]">{row.spec}</div>
-                          <p className="text-[11px] text-[#757575] leading-relaxed">{row.note}</p>
+                          <span className="text-xs text-[#4F4F4F] font-normal">
+                            Size: <strong className="text-[#1E1E1E] font-medium">{selectedSize}</strong> ({silhouetteFit})
+                          </span>
                         </div>
-                      ))}
-                    </div>
 
-                    <div className="hidden sm:block overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse tabular-nums">
-                        <thead>
-                          <tr className="border-b border-[#E5E5E5] bg-[#F8F8F8] text-[11px] text-[#4F4F4F] font-medium uppercase tracking-wider">
-                            <th className="py-2.5 px-3">Pattern Area</th>
-                            <th className="py-2.5 px-3">Finished Measurement</th>
-                            <th className="py-2.5 px-3">Seam Allowance</th>
-                            <th className="py-2.5 px-3">Tailor Note</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E5E5E5] text-xs text-[#4F4F4F]">
-                          <tr className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">Front Neckline</td>
-                            <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">4.5 cm drop · 11.2 cm half-width</td>
-                            <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">1.0 cm + 4.5 cm facing</td>
-                            <td className="py-2.5 px-3 text-[#757575] font-normal">Reinforce square neckline corners with fusible stay-tape.</td>
-                          </tr>
-                          <tr className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">Armholes</td>
-                            <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">21.0 cm depth</td>
-                            <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">1.0 cm seam</td>
-                            <td className="py-2.5 px-3 text-[#757575] font-normal">Single notch on front armhole, double notch on back armhole.</td>
-                          </tr>
-                          <tr className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">Bust &amp; Waist Darts</td>
-                            <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">2.5 cm front · 3.0 cm back</td>
-                            <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">Press toward center</td>
-                            <td className="py-2.5 px-3 text-[#757575] font-normal">Stop side bust dart 2.5 cm before the apex drill target.</td>
-                          </tr>
-                          <tr className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">Fastening / Closure</td>
-                            <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">{closureChoice}</td>
-                            <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">
-                              {closureChoice.includes("No Zipper") ? "Cut on fold" : "1.5 cm seam"}
-                            </td>
-                            <td className="py-2.5 px-3 text-[#757575] font-normal">
-                              {closureChoice.includes("No Zipper")
-                                ? "Align Center Back mark directly with folded fabric edge."
-                                : "Press fusible stay-tape along the opening edges before sewing."}
-                            </td>
-                          </tr>
-                          <tr className="hover:bg-[#FAFAFA]">
-                            <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">Bottom Hemline</td>
-                            <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">{finLength.toFixed(1)} cm length · {(hemHalfW * 4).toFixed(0)} cm sweep</td>
-                            <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">4.0 cm hem fold</td>
-                            <td className="py-2.5 px-3 text-[#757575] font-normal">Turn up 4.0 cm at the bottom and finish with a clean blind hem.</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                        {/* Mobile Spec Cards */}
+                        <div className="sm:hidden space-y-2.5 text-xs">
+                          {summaryRows.map((row) => (
+                            <div key={row.area} className="p-3 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] space-y-1.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium text-[#1E1E1E]">{row.area}</span>
+                                <span className="px-2 py-0.5 rounded-full bg-white border border-[#E0E0E0] font-mono text-[10px] text-[#4F4F4F]">
+                                  {row.allowance}
+                                </span>
+                              </div>
+                              <div className="font-mono text-[11px] font-medium text-[#1E1E1E]">{row.spec}</div>
+                              <p className="text-[11px] text-[#757575] leading-relaxed">{row.note}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="hidden sm:block overflow-x-auto">
+                          <table className="w-full text-left text-xs border-collapse tabular-nums">
+                            <thead>
+                              <tr className="border-b border-[#E5E5E5] bg-[#F8F8F8] text-[11px] text-[#4F4F4F] font-medium uppercase tracking-wider">
+                                <th className="py-2.5 px-3">Pattern Area</th>
+                                <th className="py-2.5 px-3">Finished Specification</th>
+                                <th className="py-2.5 px-3">Seam Allowance</th>
+                                <th className="py-2.5 px-3">Tailor Note</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E5E5E5] text-xs text-[#4F4F4F]">
+                              {summaryRows.map((row) => (
+                                <tr key={row.area} className="hover:bg-[#FAFAFA]">
+                                  <td className="py-2.5 px-3 font-medium text-[#1E1E1E]">{row.area}</td>
+                                  <td className="py-2.5 px-3 font-mono text-[#1E1E1E] font-medium">{row.spec}</td>
+                                  <td className="py-2.5 px-3 font-mono text-[#4F4F4F] font-normal">{row.allowance}</td>
+                                  <td className="py-2.5 px-3 text-[#757575] font-normal">{row.note}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </motion.div>
               );
             })()}
@@ -4223,9 +4559,55 @@ export default function TailorPackStudio() {
                   {/* Checklist */}
                   <div className="space-y-2.5">
                     {[
-                      { step: 1, title: "Prep the Neckline", desc: "Iron fusible interfacing onto the neckline facing pieces and stay-stitch curved edges at 1.0 cm." },
-                      { step: 2, title: "Sew the Darts", desc: "Stitch the front bust darts and front/back waist darts, then press them flat toward the center." },
-                      { step: 3, title: "Join Shoulders & Facing", desc: "Sew the front and back shoulder seams together, attach the neckline facing, and understitch." },
+                      {
+                        step: 1,
+                        title: garmentBlock === "Button-Down Shirt"
+                          ? "Fuse Yoke, Pocket & Collar Stand"
+                          : garmentBlock === "Tailored Blazer"
+                          ? "Interface Lapels & Foreparts"
+                          : `Prep the ${necklineCut} Neckline`,
+                        desc: garmentBlock === "Button-Down Shirt"
+                          ? "Apply lightweight fusible interfacing to collar stand, front placket, and cuff bands."
+                          : garmentBlock === "Tailored Blazer"
+                          ? "Fuse medium-weight tailoring canvas along notched lapel roll lines and front button stand."
+                          : `Iron fusible interfacing onto the ${necklineCut.toLowerCase()} facing pieces and stay-stitch curved edges at 1.0 cm.`
+                      },
+                      {
+                        step: 2,
+                        title: garmentBlock === "Kaftan / Boubou"
+                          ? "Prep Embroidered Neck Slit"
+                          : garmentBlock === "Button-Down Shirt"
+                          ? "Stitch Yoke, Box Pleat & Pocket"
+                          : garmentBlock === "Tailored Blazer"
+                          ? "Join Princess Panel Seams & Welt Pockets"
+                          : garmentBlock === "Slip Dress"
+                          ? "Stitch French Side Bust Darts & Straps"
+                          : "Sew the Bust & Waist Darts",
+                        desc: garmentBlock === "Kaftan / Boubou"
+                          ? "Finish center-front boubou neckline placket cleanly — zero waist darts needed."
+                          : garmentBlock === "Button-Down Shirt"
+                          ? "Attach left chest pocket, baste back box pleat, and enclose back yoke seam cleanly."
+                          : garmentBlock === "Tailored Blazer"
+                          ? "Stitch front/back princess contour seams flat and set double-welted hip pockets."
+                          : garmentBlock === "Slip Dress"
+                          ? "Construct spaghetti straps and press small side bust darts cleanly upward without waist bulk."
+                          : "Stitch the front bust darts and front/back waist darts, then press them flat toward the center."
+                      },
+                      {
+                        step: 3,
+                        title: garmentBlock === "Button-Down Shirt" || garmentBlock === "Tailored Blazer"
+                          ? "Set Shoulders & Collar / Lapels"
+                          : sleeveCut === "Sleeveless"
+                          ? "Join Shoulders & Facing"
+                          : `Join Shoulders & Set ${sleeveCut} Sleeves`,
+                        desc: garmentBlock === "Button-Down Shirt"
+                          ? "Join front and back shoulders to yoke, then sandwich pointed collar & stand cleanly."
+                          : garmentBlock === "Tailored Blazer"
+                          ? "Join padded shoulder seams, notch collar roll, and set two-piece sleeves at pitch notches."
+                          : sleeveCut === "Sleeveless"
+                          ? "Sew the front and back shoulder seams together, attach the neckline facing, and understitch."
+                          : `Join shoulders, press seams open, and ease ${sleeveCut.toLowerCase()} sleeves into front/back armhole notches.`
+                      },
                       {
                         step: 4,
                         title: closureChoice.includes("No Zipper")
@@ -4238,13 +4620,25 @@ export default function TailorPackStudio() {
                         desc: closureChoice.includes("No Zipper")
                           ? "Back piece is cut on fold with zero zippers. Neaten center-back seam allowances."
                           : closureChoice.includes("Button")
-                          ? "Sew center-front placket and stitch buttonholes spaced evenly at 7.0 cm intervals."
+                          ? `Sew center-front button placket and stitch buttonholes spaced evenly along ${garmentBlock.toLowerCase()}.`
                           : closureChoice.includes("Side")
                           ? "Sew 35 cm invisible zipper into the left side seam using 1.5 cm seam allowance."
                           : "Sew the 55 cm invisible zipper into the center-back seam using 1.5 cm seam allowance."
                       },
-                      { step: 5, title: "Close the Side Seams", desc: "Pin and stitch the left and right side seams from the underarm down to the hem, then neaten the edges." },
-                      { step: 6, title: "Hem & Final Press", desc: "Fold up the 4.0 cm bottom hem allowance, press neatly, and finish with a blind hem stitch." }
+                      {
+                        step: 5,
+                        title: garmentBlock === "Kaftan / Boubou" ? "Close Side Seams Leaving Walking Slits" : "Close the Side Seams",
+                        desc: garmentBlock === "Kaftan / Boubou"
+                          ? "Stitch flowing side drape seams leaving open lower side slits 25 cm above the hem."
+                          : "Pin and stitch the left and right side seams from underarm down to hem, then neaten edges."
+                      },
+                      {
+                        step: 6,
+                        title: garmentBlock === "Button-Down Shirt" ? "Curved Shirttail Hem & Cuffs" : "Hem & Final Press",
+                        desc: garmentBlock === "Button-Down Shirt"
+                          ? "Attach wrist cuffs/buttons and double-turn 2.0 cm narrow shirttail hem cleanly."
+                          : `Fold up the 4.0 cm bottom hem allowance on the ${garmentBlock.toLowerCase()}, press neatly, and blind-hem.`
+                      }
                     ].map((s, idx) => {
                       const isDone = completedSteps.includes(s.step);
                       return (
