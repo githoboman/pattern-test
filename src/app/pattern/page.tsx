@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import NextImage from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
   RiArrowLeftLine,
   RiArrowRightLine,
@@ -630,6 +630,25 @@ export default function TailorPackStudio() {
 
     return () => window.clearTimeout(initTimer);
   }, []);
+
+  const hasMountedStepRef = useRef(false);
+  useEffect(() => {
+    if (!hasMountedStepRef.current) {
+      hasMountedStepRef.current = true;
+      return;
+    }
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {}
+  }, [currentStep]);
+
+  useEffect(() => {
+    const anyModalOpen = showTailorModal || showQuestionsModal || showUploadModal || showTutorialModal;
+    document.body.style.overflow = anyModalOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showTailorModal, showQuestionsModal, showUploadModal, showTutorialModal]);
 
   const handleCloseTutorial = () => {
     try {
@@ -1617,16 +1636,17 @@ export default function TailorPackStudio() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-[#1E1E1E] flex flex-col font-sans antialiased selection:bg-[#E0E0E0] selection:text-[#1E1E1E]">
-      {/* Toast Notification Container - Astra Light Surface (Zero pitch black) */}
+    <MotionConfig reducedMotion="user">
+    <div className="min-h-screen overflow-x-clip bg-[#FAFAFA] text-[#1E1E1E] flex flex-col font-sans antialiased selection:bg-[#E0E0E0] selection:text-[#1E1E1E]">
+      {/* Toast Notification Container - Mobile Full Banner / Desktop Corner Pill */}
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{ opacity: 0, y: 18, scale: 0.96 }}
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 18, scale: 0.96 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 380, damping: 28 }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm p-4 rounded-2xl bg-white text-[#1E1E1E] border border-[#E0E0E0] shadow-[0_12px_32px_rgba(0,0,0,0.08)] backdrop-blur-md flex items-start gap-3">
+            className="fixed bottom-3 left-3 right-3 sm:left-auto sm:bottom-6 sm:right-6 z-50 sm:w-full sm:max-w-sm p-3.5 sm:p-4 rounded-2xl bg-white/95 text-[#1E1E1E] border border-[#E0E0E0] shadow-[0_12px_32px_rgba(0,0,0,0.08)] backdrop-blur-md flex items-start gap-3">
             <div className="p-2 rounded-xl bg-[#F8F8F8] text-[#4F4F4F] border border-[#E5E5E5] shrink-0">
               <RiCheckboxCircleLine className="w-4 h-4 text-emerald-600" />
             </div>
@@ -1636,16 +1656,16 @@ export default function TailorPackStudio() {
             </div>
             <button
               onClick={() => setToast(null)}
-              className="text-[#757575] hover:text-[#1E1E1E] text-xs p-1 transition-colors cursor-pointer shrink-0">
+              className="text-[#757575] hover:text-[#1E1E1E] text-xs p-1.5 transition-colors cursor-pointer shrink-0">
               <RiCloseLine className="w-4 h-4" />
             </button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Top Banner / Navigation - Astra Gray & Remix Icons */}
-      <header className="border-b border-[#E5E5E5] bg-white/90 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+      {/* Top Banner / Navigation - Safe for 360px+ Viewports */}
+      <header className="border-b border-[#E5E5E5] bg-white/90 backdrop-blur-md sticky top-0 z-40 px-2.5 sm:px-6 py-2 sm:py-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             type="button"
             onClick={() => {
@@ -1656,7 +1676,7 @@ export default function TailorPackStudio() {
                 setShowTutorialModal(true);
               }
             }}
-            className={`flex items-center gap-1.5 text-xs sm:text-sm px-3.5 py-1.5 flex-shrink-0 ${SECONDARY_PILL_BTN}`}>
+            className={`flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm px-2.5 sm:px-3.5 py-1.5 flex-shrink-0 ${SECONDARY_PILL_BTN}`}>
             {currentStep > 1 ? (
               <>
                 <RiArrowLeftLine className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#757575]" />
@@ -1672,13 +1692,13 @@ export default function TailorPackStudio() {
             )}
           </button>
           <div className="h-4 w-px bg-[#E5E5E5] hidden sm:block flex-shrink-0" />
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <NextImage
               src="/astra-logo.svg"
               alt="Astra Logo"
               width={88}
               height={24}
-              className="w-[78px] sm:w-[88px] h-auto flex-shrink-0"
+              className="w-[62px] sm:w-[88px] h-auto flex-shrink-0"
               priority
             />
             <div className="h-3.5 w-px bg-[#E5E5E5] hidden md:block flex-shrink-0" />
@@ -1688,15 +1708,15 @@ export default function TailorPackStudio() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
           {/* Unit Toggle: CM / IN with Framer Motion sliding pill */}
-          <div className="flex items-center p-0.5 rounded-full bg-[#F2F2F2] border border-[#E0E0E0] text-[11px] font-mono relative">
+          <div className="flex items-center p-0.5 rounded-full bg-[#F2F2F2] border border-[#E0E0E0] text-[10px] sm:text-[11px] font-mono relative">
             {(["cm", "in"] as const).map((u) => (
               <button
                 key={u}
                 type="button"
                 onClick={() => setUnit(u)}
-                className={`relative px-2.5 py-1 rounded-full transition-colors duration-150 cursor-pointer ${
+                className={`relative px-2 sm:px-2.5 py-1 rounded-full transition-colors duration-150 cursor-pointer ${
                   unit === u ? "text-[#1E1E1E] font-medium" : "text-[#757575] font-medium hover:text-[#1E1E1E]"
                 }`}>
                 {unit === u && (
@@ -1717,15 +1737,16 @@ export default function TailorPackStudio() {
               setTutorialSlide(0);
               setShowTutorialModal(true);
             }}
-            className={`group flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] sm:text-xs ${SECONDARY_PILL_BTN}`}>
+            className={`group flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs ${SECONDARY_PILL_BTN}`}>
             <RiLightbulbLine className="w-3.5 h-3.5 text-[#757575] transition-transform duration-200 group-hover:scale-110" />
-            <span>How It Works</span>
+            <span className="hidden sm:inline">How It Works</span>
+            <span className="sm:hidden">Guide</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowQuestionsModal(true)}
-            className={`group flex items-center gap-1.5 px-3.5 py-1.5 text-[11px] sm:text-xs ${SECONDARY_PILL_BTN}`}>
+            className={`group flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 text-[11px] sm:text-xs ${SECONDARY_PILL_BTN}`}>
             <RiQuestionLine className="w-3.5 h-3.5 text-[#757575] transition-transform duration-200 group-hover:scale-110" />
             <span className="hidden sm:inline">Sizing &amp; Fit Guide</span>
             <span className="sm:hidden">Sizing</span>
@@ -1734,13 +1755,13 @@ export default function TailorPackStudio() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3.5 sm:p-6 md:p-8 space-y-6 sm:space-y-7">
-        {/* Step Indicator (3-Step Streamlined Wizard - Sliding Gray Outline Highlight) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3.5">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 py-4 sm:p-6 md:p-8 space-y-4 sm:space-y-7">
+        {/* Step Indicator (Compact Horizontal Row on Mobile / Full Cards on Desktop) */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-3.5">
           {[
-            { step: 1, title: "1. Choose Design", desc: "Upload a photo or pick an outfit block" },
-            { step: 2, title: "2. Size & Fit", desc: "Pick size, body measurements & fastening" },
-            { step: 3, title: "3. Pattern & Tailor Sheet", desc: "CAD vector flat, measurements & guide" }
+            { step: 1, title: "1. Choose Design", shortTitle: "Design", desc: "Upload a photo or pick an outfit block" },
+            { step: 2, title: "2. Size & Fit", shortTitle: "Size & Fit", desc: "Pick size, body measurements & fastening" },
+            { step: 3, title: "3. Pattern & Tailor Sheet", shortTitle: "Pattern", desc: "CAD vector flat, measurements & guide" }
           ].map((item) => {
             const isActive = currentStep === item.step;
             const isCompleted = currentStep > item.step;
@@ -1749,10 +1770,10 @@ export default function TailorPackStudio() {
                 key={item.step}
                 type="button"
                 whileHover={{ y: -2 }}
-                whileTap={{ scale: 0.985 }}
+                whileTap={{ scale: 0.97 }}
                 transition={{ duration: 0.16, ease: EDITORIAL_EASE }}
                 onClick={() => setCurrentStep(item.step)}
-                className={`relative p-3.5 sm:p-4 rounded-2xl border text-left transition-colors duration-200 cursor-pointer overflow-hidden ${
+                className={`relative px-2 py-2.5 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition-colors duration-200 cursor-pointer overflow-hidden ${
                   isActive
                     ? "bg-white border-transparent text-[#1E1E1E]"
                     : isCompleted
@@ -1763,17 +1784,17 @@ export default function TailorPackStudio() {
                   <motion.div
                     layoutId="wizard-active-step"
                     transition={TACTILE_SPRING}
-                    className="absolute inset-0 rounded-2xl border border-[#757575] ring-1 ring-[#BDBDBD]/50 shadow-[0_2px_12px_rgba(0,0,0,0.04)] pointer-events-none"
+                    className="absolute inset-0 rounded-xl sm:rounded-2xl border border-[#757575] ring-1 ring-[#BDBDBD]/50 shadow-[0_2px_12px_rgba(0,0,0,0.04)] pointer-events-none"
                   />
                 )}
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
+                <div className="relative z-10 flex items-center justify-center sm:justify-between">
+                  <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
                     <motion.span
                       key={`${item.step}-${isActive ? "a" : isCompleted ? "c" : "i"}`}
                       initial={{ scale: 0.85, opacity: 0.7 }}
                       animate={{ scale: 1, opacity: 1 }}
                       transition={TACTILE_SPRING}
-                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-medium transition-colors duration-200 ${
+                      className={`w-5 h-5 rounded-full shrink-0 flex items-center justify-center text-[10px] font-mono font-medium transition-colors duration-200 ${
                         isActive
                           ? "bg-[#4F4F4F] text-white"
                           : isCompleted
@@ -1782,17 +1803,20 @@ export default function TailorPackStudio() {
                       }`}>
                       {isCompleted ? <RiCheckLine className="w-3 h-3" /> : item.step}
                     </motion.span>
-                    <span className={`text-xs sm:text-sm font-medium tracking-tight ${isActive ? "text-[#1E1E1E]" : "text-[#4F4F4F]"}`}>
+                    <span className={`hidden sm:inline text-xs sm:text-sm font-medium tracking-tight truncate ${isActive ? "text-[#1E1E1E]" : "text-[#4F4F4F]"}`}>
                       {item.title}
+                    </span>
+                    <span className={`sm:hidden text-[11px] font-medium tracking-tight truncate ${isActive ? "text-[#1E1E1E]" : "text-[#4F4F4F]"}`}>
+                      {item.shortTitle}
                     </span>
                   </div>
                   {isCompleted && (
-                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={TACTILE_SPRING}>
+                    <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={TACTILE_SPRING} className="hidden sm:inline-flex">
                       <RiCheckLine className="w-4 h-4 text-[#757575] flex-shrink-0" />
                     </motion.span>
                   )}
                 </div>
-                <p className={`relative z-10 text-[11px] mt-1 pl-7 truncate font-normal ${isActive ? "text-[#4F4F4F]" : "text-[#757575]"}`}>
+                <p className={`hidden sm:block relative z-10 text-[11px] mt-1 pl-7 truncate font-normal ${isActive ? "text-[#4F4F4F]" : "text-[#757575]"}`}>
                   {item.desc}
                 </p>
               </motion.button>
@@ -2236,9 +2260,12 @@ export default function TailorPackStudio() {
                 ].map((card, idx) => {
                   const isObserved = card.item.status === "observed";
                   return (
-                    <div
+                    <motion.div
                       key={idx}
-                      className="p-3 rounded-xl border border-[#E5E5E5] bg-[#F8F8F8]">
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: idx * 0.03, ease: EDITORIAL_EASE }}
+                      className="p-2.5 sm:p-3 rounded-xl border border-[#E5E5E5] bg-[#F8F8F8]">
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="text-[#4F4F4F] font-medium truncate">{card.label}</span>
                         <span
@@ -2253,7 +2280,7 @@ export default function TailorPackStudio() {
                       <div className="mt-1.5 text-xs font-medium text-[#1E1E1E] truncate capitalize">
                         {card.item.value || <span className="text-[#757575] text-[11px] font-normal">Selected below</span>}
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })}
               </div>
@@ -2339,6 +2366,7 @@ export default function TailorPackStudio() {
                       </label>
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={bodyBust}
                         onChange={(e) => {
                           setBodyBust(Number(e.target.value));
@@ -2354,6 +2382,7 @@ export default function TailorPackStudio() {
                       </label>
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={bodyWaist}
                         onChange={(e) => {
                           setBodyWaist(Number(e.target.value));
@@ -2369,6 +2398,7 @@ export default function TailorPackStudio() {
                       </label>
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={bodyHip}
                         onChange={(e) => {
                           setBodyHip(Number(e.target.value));
@@ -2384,6 +2414,7 @@ export default function TailorPackStudio() {
                       </label>
                       <input
                         type="number"
+                        inputMode="decimal"
                         value={bodyLength}
                         onChange={(e) => {
                           setBodyLength(Number(e.target.value));
@@ -2396,39 +2427,52 @@ export default function TailorPackStudio() {
                 </div>
 
                 {/* Garment Cut Adjustments */}
-                <div className="p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-4">
-                  <div className="flex items-center justify-between">
+                <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-4">
+                  <div className="flex items-center justify-between gap-2">
                     <h3 className="text-xs font-medium text-[#1E1E1E] uppercase tracking-wider">
                       3. Outfit Block, Fastening &amp; Fit
                     </h3>
-                    <span className="text-[11px] font-mono font-medium text-[#4F4F4F] bg-[#F2F2F2] px-2.5 py-0.5 rounded-full border border-[#E0E0E0]">
+                    <span className="text-[11px] font-mono font-medium text-[#4F4F4F] bg-[#F2F2F2] px-2.5 py-0.5 rounded-full border border-[#E0E0E0] shrink-0">
                       {garmentBlock}
                     </span>
                   </div>
 
                   {/* Outfit Pattern Block Selector (6 Full Garment Blocks) */}
                   <div className="space-y-1.5">
-                    <label className="text-xs text-[#4F4F4F] font-medium block">Outfit Pattern Block (Changes the CAD Silhouette &amp; Default Fastening)</label>
+                    <label className="text-xs text-[#4F4F4F] font-medium block">Outfit Pattern Block (Changes CAD Silhouette &amp; Default Fastening)</label>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {(["Sheath Dress", "A-Line Dress", "Slip Dress", "Tailored Blazer", "Button-Down Shirt", "Kaftan / Boubou"] as const).map((blk) => (
-                        <button
-                          key={blk}
-                          type="button"
-                          onClick={() => handleGarmentBlockChange(blk)}
-                          className={`p-2.5 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                            garmentBlock === blk ? OPTION_ACTIVE : OPTION_IDLE
-                          }`}>
-                          {blk}
-                        </button>
-                      ))}
+                      {(["Sheath Dress", "A-Line Dress", "Slip Dress", "Tailored Blazer", "Button-Down Shirt", "Kaftan / Boubou"] as const).map((blk) => {
+                        const isSelected = garmentBlock === blk;
+                        return (
+                          <motion.button
+                            key={blk}
+                            type="button"
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.97 }}
+                            transition={{ duration: 0.14 }}
+                            onClick={() => handleGarmentBlockChange(blk)}
+                            className={`relative p-2.5 rounded-xl border text-xs font-medium transition-colors duration-150 cursor-pointer ${
+                              isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
+                            }`}>
+                            {isSelected && (
+                              <motion.div
+                                layoutId="step2-block-active"
+                                transition={TACTILE_SPRING}
+                                className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                              />
+                            )}
+                            <span className="relative z-10">{blk}</span>
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {/* Fastening / Closure Selector (Explicitly supports Non-Zipper Outfits!) */}
+                  {/* Fastening / Closure Selector */}
                   <div className="space-y-1.5 pt-1">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-[#4F4F4F] font-medium">Fastening / Closure (Draws directly on Front or Back Piece)</label>
-                      <span className="text-[10px] font-mono font-medium text-[#4F4F4F] bg-[#F2F2F2] px-2.5 py-0.5 rounded-full border border-[#E0E0E0]">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-xs text-[#4F4F4F] font-medium">Fastening / Closure</label>
+                      <span className="text-[10px] font-mono font-medium text-[#4F4F4F] bg-[#F2F2F2] px-2.5 py-0.5 rounded-full border border-[#E0E0E0] shrink-0">
                         {closureChoice.includes("No Zipper") || closureChoice.includes("Button") ? "NO ZIPPER" : "ZIPPER"}
                       </span>
                     </div>
@@ -2442,18 +2486,28 @@ export default function TailorPackStudio() {
                       ].map((opt) => {
                         const isSelected = closureChoice === opt.label;
                         return (
-                          <button
+                          <motion.button
                             key={opt.label}
                             type="button"
+                            whileHover={{ y: -1 }}
+                            whileTap={{ scale: 0.98 }}
+                            transition={{ duration: 0.14 }}
                             onClick={() => handleClosureChange(opt.label)}
-                            className={`p-2.5 rounded-xl border text-left transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                              isSelected ? OPTION_ACTIVE : OPTION_IDLE
+                            className={`relative p-2.5 rounded-xl border text-left transition-colors duration-150 cursor-pointer ${
+                              isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
                             }`}>
-                            <div className="text-xs font-medium text-[#1E1E1E]">{opt.label}</div>
-                            <div className="text-[10px] font-normal mt-0.5 text-[#757575]">
+                            {isSelected && (
+                              <motion.div
+                                layoutId="step2-closure-active"
+                                transition={TACTILE_SPRING}
+                                className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                              />
+                            )}
+                            <div className="relative z-10 text-xs font-medium text-[#1E1E1E]">{opt.label}</div>
+                            <div className="relative z-10 text-[10px] font-normal mt-0.5 text-[#757575]">
                               {opt.sub}
                             </div>
-                          </button>
+                          </motion.button>
                         );
                       })}
                     </div>
@@ -2464,34 +2518,60 @@ export default function TailorPackStudio() {
                     <div className="space-y-1.5">
                       <label className="text-xs text-[#4F4F4F] font-medium block">Neckline Shape</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {(["Square", "Round", "V-Neck", "Sweetheart"] as const).map((neck) => (
-                          <button
-                            key={neck}
-                            type="button"
-                            onClick={() => handleNecklineChange(neck)}
-                            className={`p-2 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                              necklineCut === neck ? OPTION_ACTIVE : OPTION_IDLE
-                            }`}>
-                            {neck}
-                          </button>
-                        ))}
+                        {(["Square", "Round", "V-Neck", "Sweetheart"] as const).map((neck) => {
+                          const isSelected = necklineCut === neck;
+                          return (
+                            <motion.button
+                              key={neck}
+                              type="button"
+                              whileHover={{ y: -1 }}
+                              whileTap={{ scale: 0.96 }}
+                              transition={{ duration: 0.14 }}
+                              onClick={() => handleNecklineChange(neck)}
+                              className={`relative p-2.5 sm:p-2 rounded-xl border text-xs font-medium transition-colors duration-150 cursor-pointer ${
+                                isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
+                              }`}>
+                              {isSelected && (
+                                <motion.div
+                                  layoutId="step2-neck-active"
+                                  transition={TACTILE_SPRING}
+                                  className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                                />
+                              )}
+                              <span className="relative z-10">{neck}</span>
+                            </motion.button>
+                          );
+                        })}
                       </div>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs text-[#4F4F4F] font-medium block">Sleeves</label>
                       <div className="grid grid-cols-3 gap-2">
-                        {(["Sleeveless", "Short", "Long"] as const).map((slv) => (
-                          <button
-                            key={slv}
-                            type="button"
-                            onClick={() => handleSleeveChange(slv)}
-                            className={`p-2 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                              sleeveCut === slv ? OPTION_ACTIVE : OPTION_IDLE
-                            }`}>
-                            {slv}
-                          </button>
-                        ))}
+                        {(["Sleeveless", "Short", "Long"] as const).map((slv) => {
+                          const isSelected = sleeveCut === slv;
+                          return (
+                            <motion.button
+                              key={slv}
+                              type="button"
+                              whileHover={{ y: -1 }}
+                              whileTap={{ scale: 0.96 }}
+                              transition={{ duration: 0.14 }}
+                              onClick={() => handleSleeveChange(slv)}
+                              className={`relative p-2.5 sm:p-2 rounded-xl border text-xs font-medium transition-colors duration-150 cursor-pointer ${
+                                isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
+                              }`}>
+                              {isSelected && (
+                                <motion.div
+                                  layoutId="step2-sleeve-active"
+                                  transition={TACTILE_SPRING}
+                                  className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                                />
+                              )}
+                              <span className="relative z-10">{slv}</span>
+                            </motion.button>
+                          );
+                        })}
                       </div>
                       <p className="text-[11px] text-[#757575] font-normal">
                         {sleeveCut === "Sleeveless"
@@ -2506,17 +2586,30 @@ export default function TailorPackStudio() {
                     <div className="space-y-1.5">
                       <label className="text-xs text-[#4F4F4F] font-medium block">Length Preset</label>
                       <div className="grid grid-cols-3 gap-2">
-                        {(["Mini", "Midi", "Maxi"] as const).map((cut) => (
-                          <button
-                            key={cut}
-                            type="button"
-                            onClick={() => handleHemCutChange(cut)}
-                            className={`p-2.5 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                              hemCut === cut ? OPTION_ACTIVE : OPTION_IDLE
-                            }`}>
-                            {cut}
-                          </button>
-                        ))}
+                        {(["Mini", "Midi", "Maxi"] as const).map((cut) => {
+                          const isSelected = hemCut === cut;
+                          return (
+                            <motion.button
+                              key={cut}
+                              type="button"
+                              whileHover={{ y: -1 }}
+                              whileTap={{ scale: 0.96 }}
+                              transition={{ duration: 0.14 }}
+                              onClick={() => handleHemCutChange(cut)}
+                              className={`relative p-2.5 rounded-xl border text-xs font-medium transition-colors duration-150 cursor-pointer ${
+                                isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
+                              }`}>
+                              {isSelected && (
+                                <motion.div
+                                  layoutId="step2-hem-active"
+                                  transition={TACTILE_SPRING}
+                                  className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                                />
+                              )}
+                              <span className="relative z-10">{cut}</span>
+                            </motion.button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2527,17 +2620,30 @@ export default function TailorPackStudio() {
                         <span className="text-[10px] text-[#757575] font-normal">Comfort Room</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        {(["Fitted", "Semi-Fitted", "Relaxed"] as const).map((fit) => (
-                          <button
-                            key={fit}
-                            type="button"
-                            onClick={() => handleSilhouetteFitChange(fit)}
-                            className={`p-2.5 rounded-xl border text-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer ${
-                              silhouetteFit === fit ? OPTION_ACTIVE : OPTION_IDLE
-                            }`}>
-                            {fit}
-                          </button>
-                        ))}
+                        {(["Fitted", "Semi-Fitted", "Relaxed"] as const).map((fit) => {
+                          const isSelected = silhouetteFit === fit;
+                          return (
+                            <motion.button
+                              key={fit}
+                              type="button"
+                              whileHover={{ y: -1 }}
+                              whileTap={{ scale: 0.96 }}
+                              transition={{ duration: 0.14 }}
+                              onClick={() => handleSilhouetteFitChange(fit)}
+                              className={`relative p-2.5 rounded-xl border text-xs font-medium transition-colors duration-150 cursor-pointer ${
+                                isSelected ? "text-[#1E1E1E] border-transparent" : OPTION_IDLE
+                              }`}>
+                              {isSelected && (
+                                <motion.div
+                                  layoutId="step2-fit-active"
+                                  transition={TACTILE_SPRING}
+                                  className="absolute inset-0 rounded-xl bg-[#F2F2F2] border border-[#757575] ring-1 ring-[#BDBDBD]/60 shadow-2xs pointer-events-none"
+                                />
+                              )}
+                              <span className="relative z-10">{fit}</span>
+                            </motion.button>
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
@@ -2711,69 +2817,69 @@ export default function TailorPackStudio() {
                 </p>
               </div>
 
-              {/* Action Toolbar - Secondary Outline Pills + Single Primary Pill CTA */}
-              <div className="flex items-center gap-2 flex-wrap w-full lg:w-auto">
+              {/* Action Toolbar - Clean 2-col Mobile Grid + Full Primary CTA */}
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap w-full lg:w-auto">
                 <button
                   onClick={() => setShowUploadModal(true)}
                   title="Upload a different outfit photo"
-                  className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                  className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                   <RiUploadCloud2Line className="w-3.5 h-3.5 text-[#757575]" />
-                  Change Photo
+                  <span>Change Photo</span>
                 </button>
 
                 <button
                   onClick={() => setShowTailorModal(true)}
-                  className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                  className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                   <RiScissors2Line className="w-3.5 h-3.5 text-[#757575]" />
-                  Adjust Fit
+                  <span>Adjust Fit</span>
                 </button>
 
                 <button
                   onClick={handleDownloadSVG}
                   title="Download SVG pattern file"
-                  className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                  className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                   <RiFileCodeLine className="w-3.5 h-3.5 text-[#757575]" />
-                  Download SVG
+                  <span>Download SVG</span>
                 </button>
 
                 <button
                   onClick={() => handleShareWithTailor("copy")}
                   title="Copy full measurement & fabric summary to clipboard"
-                  className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                  className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                   <RiFileTextLine className="w-3.5 h-3.5 text-[#757575]" />
-                  Copy Summary
+                  <span>Copy Summary</span>
                 </button>
 
                 <button
                   onClick={() => handleShareWithTailor("whatsapp")}
                   title="Send pattern measurements & fabric yardage to your tailor on WhatsApp"
-                  className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                  className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                   <RiSendPlaneLine className="w-3.5 h-3.5 text-[#757575]" />
-                  Send to WhatsApp
+                  <span>WhatsApp</span>
                 </button>
 
                 {versionStatus === "Draft" ? (
                   <button
                     onClick={handleApprove}
-                    className={`px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
+                    className={`justify-center px-3 sm:px-3.5 py-2 text-xs flex items-center gap-1.5 ${SECONDARY_PILL_BTN}`}>
                     <RiCheckboxCircleLine className="w-3.5 h-3.5 text-[#757575]" />
-                    Approve Pattern
+                    <span>Approve</span>
                   </button>
                 ) : (
                   <button
                     disabled
-                    className="px-3.5 py-2 rounded-full bg-[#F2F2F2] border border-[#E0E0E0] text-xs font-medium text-[#757575] flex items-center gap-1.5 cursor-not-allowed">
+                    className="justify-center px-3 sm:px-3.5 py-2 rounded-full bg-[#F2F2F2] border border-[#E0E0E0] text-xs font-medium text-[#757575] flex items-center gap-1.5 cursor-not-allowed">
                     <RiLockLine className="w-3.5 h-3.5" />
-                    Approved
+                    <span>Approved</span>
                   </button>
                 )}
 
                 {/* Primary Pill CTA Button Only */}
                 <button
                   onClick={handleExportPDF}
-                  className={`px-5 py-2 text-xs flex items-center gap-1.5 ${PRIMARY_PILL_BTN}`}>
+                  className={`col-span-2 sm:col-span-1 justify-center px-5 py-2.5 sm:py-2 text-xs flex items-center gap-1.5 ${PRIMARY_PILL_BTN}`}>
                   <RiPrinterLine className="w-3.5 h-3.5" />
-                  Print / Save PDF
+                  <span>Print / Save PDF</span>
                 </button>
               </div>
             </div>
@@ -2817,8 +2923,8 @@ export default function TailorPackStudio() {
               </div>
             </div>
 
-            {/* Sub-tab Navigation (Sliding Indicator + Horizontal Scroll on Mobile) */}
-            <div className="flex border-b border-[#E5E5E5] gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none pb-0.5 -mx-1 px-1">
+              {/* Sub-tab Navigation (Sliding Indicator + Touch Scroll on Mobile) */}
+            <div className="flex border-b border-[#E5E5E5] gap-1 sm:gap-1.5 overflow-x-auto touch-pan-x whitespace-nowrap scrollbar-none pb-0.5 -mx-1 px-1">
               {[
                 { id: "flats", label: "Pattern Drawing", icon: RiFileTextLine },
                 { id: "measurements", label: `Measurements (${selectedSize})`, icon: RiRuler2Line },
@@ -3030,24 +3136,24 @@ export default function TailorPackStudio() {
 
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => setSvgZoom((z) => Math.max(0.7, Number((z - 0.1).toFixed(1))))}
+                          onClick={() => setSvgZoom((z) => Math.max(0.7, Number((z - 0.15).toFixed(2))))}
                           title="Zoom Out"
-                          className="p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
+                          className="p-2 sm:p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
                           <RiZoomOutLine className="w-3.5 h-3.5" />
                         </button>
-                        <span className="font-mono text-[11px] text-[#1E1E1E] w-10 text-center font-medium tabular-nums">
+                        <span className="font-mono text-[11px] text-[#1E1E1E] w-11 text-center font-medium tabular-nums">
                           {(svgZoom * 100).toFixed(0)}%
                         </span>
                         <button
-                          onClick={() => setSvgZoom((z) => Math.min(1.5, Number((z + 0.1).toFixed(1))))}
+                          onClick={() => setSvgZoom((z) => Math.min(2.0, Number((z + 0.15).toFixed(2))))}
                           title="Zoom In"
-                          className="p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
+                          className="p-2 sm:p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
                           <RiZoomInLine className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => setSvgZoom(1)}
                           title="Reset Zoom"
-                          className="p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
+                          className="p-2 sm:p-1.5 rounded-full bg-white hover:bg-[#F5F5F5] border border-[#E0E0E0] hover:border-[#BDBDBD] text-[#4F4F4F] transition-colors cursor-pointer">
                           <RiFullscreenLine className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -3186,20 +3292,28 @@ export default function TailorPackStudio() {
                     </AnimatePresence>
                   </div>
 
-                  {/* Technical Drawing Canvas */}
-                  <div className="w-full bg-white border border-[#E0E0E0] rounded-2xl p-3 sm:p-6 flex flex-col items-center justify-center overflow-x-auto relative shadow-2xs">
-                    <div
-                      style={{
-                        transform: `scale(${svgZoom})`,
-                        transformOrigin: "center top",
-                        transition: "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
-                      }}
-                      className="w-full flex justify-center">
-                      <svg
-                        ref={svgRef}
-                        viewBox="0 0 920 620"
-                        className="w-full min-w-[560px] sm:min-w-0 max-w-4xl h-auto select-none"
-                        style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+                  {/* Technical Drawing Canvas (Left-Safe Scroll + Width-Based Zoom for Touch Devices) */}
+                  <div className="w-full bg-white border border-[#E0E0E0] rounded-2xl p-2 sm:p-6 relative shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between text-[10px] text-[#757575] px-1 sm:hidden">
+                      <span>Tap any pattern layer above or piece below to inspect</span>
+                      <span className="font-mono">{svgZoom > 1 ? "Swipe to pan" : "Tap + to zoom"}</span>
+                    </div>
+                    <div className="w-full overflow-x-auto overscroll-x-contain touch-pan-x touch-pan-y rounded-xl">
+                      <div
+                        style={{
+                          width: `${Math.max(100, svgZoom * 100)}%`,
+                          minWidth: svgZoom > 1 ? `${Math.round(svgZoom * 520)}px` : "100%",
+                          transition: "width 0.24s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.24s cubic-bezier(0.22, 1, 0.36, 1)"
+                        }}
+                        className="mx-auto max-w-none">
+                        <svg
+                          ref={svgRef}
+                          viewBox="0 0 920 620"
+                          className="w-full max-w-4xl mx-auto h-auto select-none block"
+                          style={{
+                            maxWidth: svgZoom > 1 ? "none" : undefined,
+                            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
+                          }}>
                         {/* Architectural CAD Grid & Definitions */}
                         <defs>
                           <pattern id="minorGrid" width="15" height="15" patternUnits="userSpaceOnUse">
@@ -3717,25 +3831,28 @@ export default function TailorPackStudio() {
                           SOLID = NET SEWING LINE  //  DASHED OUTER = 1.5cm SEAM ALLOWANCE
                         </text>
                       </svg>
+                      </div>
                     </div>
                   </div>
 
                   {/* Bottom Vector Action Bar */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#4F4F4F] px-1 py-1">
-                    <span className="flex items-center gap-2 font-normal text-[#4F4F4F]">
-                      <RiCodeSSlashLine className="w-4 h-4 text-[#757575]" />
-                      Drawn to 1:10 scale. Ready to print or open in pattern software (Seamly2D, Clo3D, Illustrator).
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#4F4F4F] px-1 py-1">
+                    <span className="flex items-start sm:items-center gap-2 font-normal text-[#4F4F4F]">
+                      <RiCodeSSlashLine className="w-4 h-4 text-[#757575] shrink-0 mt-0.5 sm:mt-0" />
+                      <span>Drawn to 1:10 scale. Ready to print or open in pattern software (Seamly2D, Clo3D, Illustrator).</span>
                     </span>
-                    <div className="flex items-center gap-2">
+                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                       <button
                         onClick={handleDownloadSVG}
-                        className={`flex items-center gap-1.5 px-4 py-2 text-xs ${SECONDARY_PILL_BTN}`}>
-                        <RiDownload2Line className="w-3.5 h-3.5 text-[#757575]" /> Download Pattern (.svg)
+                        className={`justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs ${SECONDARY_PILL_BTN}`}>
+                        <RiDownload2Line className="w-3.5 h-3.5 text-[#757575]" />
+                        <span>Pattern (.svg)</span>
                       </button>
                       <button
                         onClick={handleDownloadJSON}
-                        className={`flex items-center gap-1.5 px-4 py-2 text-xs ${SECONDARY_PILL_BTN}`}>
-                        <RiDownload2Line className="w-3.5 h-3.5 text-[#757575]" /> Download Data (.json)
+                        className={`justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2 text-xs ${SECONDARY_PILL_BTN}`}>
+                        <RiDownload2Line className="w-3.5 h-3.5 text-[#757575]" />
+                        <span>Data (.json)</span>
                       </button>
                     </div>
                   </div>
@@ -3801,9 +3918,9 @@ export default function TailorPackStudio() {
                     </div>
                   </div>
 
-                  {/* QUICK TAILOR SUMMARY & SEAM ALLOWANCES TABLE */}
-                  <div className="p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-3.5">
-                    <div className="flex items-center justify-between">
+                  {/* QUICK TAILOR SUMMARY & SEAM ALLOWANCES TABLE (Mobile Cards + Desktop Table) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#E0E0E0] space-y-3.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                       <div className="flex items-center gap-2">
                         <RiRuler2Line className="w-4 h-4 text-[#757575]" />
                         <h4 className="text-xs font-medium text-[#1E1E1E] uppercase tracking-wider">
@@ -3815,7 +3932,56 @@ export default function TailorPackStudio() {
                       </span>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    {/* Mobile Spec Cards */}
+                    <div className="sm:hidden space-y-2.5 text-xs">
+                      {[
+                        {
+                          area: "Front Neckline",
+                          spec: "4.5 cm drop · 11.2 cm half-width",
+                          allowance: "1.0 cm + 4.5 cm facing",
+                          note: "Reinforce square neckline corners with fusible stay-tape."
+                        },
+                        {
+                          area: "Armholes",
+                          spec: "21.0 cm depth",
+                          allowance: "1.0 cm seam",
+                          note: "Single notch on front armhole, double notch on back armhole."
+                        },
+                        {
+                          area: "Bust & Waist Darts",
+                          spec: "2.5 cm front · 3.0 cm back",
+                          allowance: "Press toward center",
+                          note: "Stop side bust dart 2.5 cm before the apex drill target."
+                        },
+                        {
+                          area: "Fastening / Closure",
+                          spec: closureChoice,
+                          allowance: closureChoice.includes("No Zipper") ? "Cut on fold" : "1.5 cm seam",
+                          note: closureChoice.includes("No Zipper")
+                            ? "Align Center Back mark directly with folded fabric edge."
+                            : "Press fusible stay-tape along the opening edges before sewing."
+                        },
+                        {
+                          area: "Bottom Hemline",
+                          spec: `${finLength.toFixed(1)} cm length · ${(hemHalfW * 4).toFixed(0)} cm sweep`,
+                          allowance: "4.0 cm hem fold",
+                          note: "Turn up 4.0 cm at the bottom and finish with a clean blind hem."
+                        }
+                      ].map((row) => (
+                        <div key={row.area} className="p-3 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-[#1E1E1E]">{row.area}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-white border border-[#E0E0E0] font-mono text-[10px] text-[#4F4F4F]">
+                              {row.allowance}
+                            </span>
+                          </div>
+                          <div className="font-mono text-[11px] font-medium text-[#1E1E1E]">{row.spec}</div>
+                          <p className="text-[11px] text-[#757575] leading-relaxed">{row.note}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="hidden sm:block overflow-x-auto">
                       <table className="w-full text-left text-xs border-collapse tabular-nums">
                         <thead>
                           <tr className="border-b border-[#E5E5E5] bg-[#F8F8F8] text-[11px] text-[#4F4F4F] font-medium uppercase tracking-wider">
@@ -3894,7 +4060,61 @@ export default function TailorPackStudio() {
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-2xl border border-[#E0E0E0] bg-white">
+                {/* Mobile Touch Measurement Cards */}
+                <div className="sm:hidden space-y-2.5">
+                  {calculatedRows.map((row, i) => (
+                    <motion.div
+                      key={row.fieldKey}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: i * 0.035, ease: EDITORIAL_EASE }}
+                      className="p-3.5 rounded-2xl border border-[#E0E0E0] bg-white space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="font-medium text-sm text-[#1E1E1E] block">{row.label}</span>
+                          <span className="text-[11px] text-[#757575]">{row.rule_id}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] uppercase tracking-wider text-[#757575] block">Final Size</span>
+                          <motion.strong
+                            key={`${row.fieldKey}-${row.garment}`}
+                            initial={{ opacity: 0.4, scale: 0.96 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.18 }}
+                            className="font-mono text-sm font-medium text-[#1E1E1E] tabular-nums">
+                            {fmtUnit(row.garment)}
+                          </motion.strong>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-[#F8F8F8] p-2.5 rounded-xl border border-[#E5E5E5] tabular-nums">
+                        <div>
+                          <span className="text-[10px] font-sans text-[#757575] block">Body Size</span>
+                          <span className="text-[#4F4F4F]">{fmtUnit(row.body)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-sans text-[#757575] block">Comfort Room</span>
+                          <span className="text-[#1E1E1E] font-medium">+{fmtUnit(row.ease)}</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjustEase(row.fieldKey, -0.5)}
+                          className="py-2 rounded-full bg-white hover:bg-[#F5F5F5] active:scale-[0.97] text-[#4F4F4F] border border-[#E0E0E0] text-xs font-medium transition-all cursor-pointer">
+                          Tighter (-0.5 cm)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickAdjustEase(row.fieldKey, 0.5)}
+                          className="py-2 rounded-full bg-white hover:bg-[#F5F5F5] active:scale-[0.97] text-[#4F4F4F] border border-[#E0E0E0] text-xs font-medium transition-all cursor-pointer">
+                          Looser (+0.5 cm)
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <div className="hidden sm:block overflow-x-auto rounded-2xl border border-[#E0E0E0] bg-white">
                   <table className="w-full text-left text-xs text-[#4F4F4F] tabular-nums">
                     <thead className="bg-[#F8F8F8] text-[#4F4F4F] border-b border-[#E5E5E5] uppercase text-[11px] font-medium tracking-wider">
                       <tr>
@@ -4025,20 +4245,26 @@ export default function TailorPackStudio() {
                       },
                       { step: 5, title: "Close the Side Seams", desc: "Pin and stitch the left and right side seams from the underarm down to the hem, then neaten the edges." },
                       { step: 6, title: "Hem & Final Press", desc: "Fold up the 4.0 cm bottom hem allowance, press neatly, and finish with a blind hem stitch." }
-                    ].map((s) => {
+                    ].map((s, idx) => {
                       const isDone = completedSteps.includes(s.step);
                       return (
-                        <div
+                        <motion.div
                           key={s.step}
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2, delay: idx * 0.03, ease: EDITORIAL_EASE }}
+                          whileTap={{ scale: 0.99 }}
                           onClick={() => toggleStep(s.step)}
-                          className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 active:scale-[0.99] flex items-start gap-3.5 ${
+                          className={`p-3.5 rounded-xl border cursor-pointer transition-colors duration-150 flex items-start gap-3.5 ${
                             isDone
                               ? "bg-[#F8F8F8] border-[#E5E5E5] text-[#757575]"
                               : "bg-white border-[#E0E0E0] hover:border-[#BDBDBD] text-[#1E1E1E]"
                           }`}>
-                          <button className="mt-0.5 text-[#4F4F4F]">
+                          <button type="button" className="mt-0.5 text-[#4F4F4F]">
                             {isDone ? (
-                              <RiCheckboxCircleLine className="w-4 h-4 text-emerald-600" />
+                              <motion.span initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={TACTILE_SPRING} className="inline-flex">
+                                <RiCheckboxCircleLine className="w-4 h-4 text-emerald-600" />
+                              </motion.span>
                             ) : (
                               <RiCheckboxBlankLine className="w-4 h-4 text-[#BDBDBD]" />
                             )}
@@ -4049,7 +4275,7 @@ export default function TailorPackStudio() {
                             </span>
                             <p className={isDone ? "text-[#757575] line-through font-normal" : "text-[#4F4F4F] font-normal"}>{s.desc}</p>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -4146,7 +4372,12 @@ export default function TailorPackStudio() {
                 ) : (
                   <div className="space-y-3">
                     {corrections.map((c, i) => (
-                      <div key={i} className="p-4 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] text-xs space-y-2">
+                      <motion.div
+                        key={`${c.version}-${i}`}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, delay: i * 0.03, ease: EDITORIAL_EASE }}
+                        className="p-4 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] text-xs space-y-2">
                         <div className="flex justify-between items-center text-[#4F4F4F]">
                           <div className="flex items-center gap-2">
                             <span className="px-2.5 py-0.5 rounded-full bg-[#F2F2F2] border border-[#E0E0E0] text-[#4F4F4F] text-[10px] font-mono font-medium">
@@ -4169,7 +4400,7 @@ export default function TailorPackStudio() {
                             Note: {c.notes}
                           </p>
                         )}
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 )}
@@ -4233,13 +4464,13 @@ export default function TailorPackStudio() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
             <motion.div
-              initial={{ scale: 0.96, y: 12, opacity: 0 }}
+              initial={{ scale: 0.98, y: 24, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.96, y: 8, opacity: 0 }}
+              exit={{ scale: 0.98, y: 20, opacity: 0 }}
               transition={MODAL_SPRING}
-              className="w-full max-w-lg bg-white border border-[#E0E0E0] rounded-2xl p-4 sm:p-6 space-y-4 shadow-xl max-h-[90vh] overflow-y-auto">
+              className="w-full max-w-lg bg-white border border-[#E0E0E0] rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 space-y-4 shadow-xl max-h-[88dvh] sm:max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <RiScissors2Line className="w-4 h-4 text-[#757575]" />
@@ -4364,13 +4595,13 @@ export default function TailorPackStudio() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
             <motion.div
-              initial={{ scale: 0.96, y: 12, opacity: 0 }}
+              initial={{ scale: 0.98, y: 24, opacity: 0 }}
               animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0.96, y: 8, opacity: 0 }}
+              exit={{ scale: 0.98, y: 20, opacity: 0 }}
               transition={MODAL_SPRING}
-              className="w-full max-w-2xl bg-white border border-[#E0E0E0] rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col">
+              className="w-full max-w-2xl bg-white border border-[#E0E0E0] rounded-t-3xl sm:rounded-2xl p-4 sm:p-6 space-y-4 shadow-2xl max-h-[88dvh] sm:max-h-[90vh] flex flex-col">
               
               {/* Header */}
               <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
@@ -4520,13 +4751,13 @@ export default function TailorPackStudio() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 24 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 20 }}
               transition={MODAL_SPRING}
-              className="bg-white rounded-2xl border border-[#E0E0E0] shadow-xl max-w-lg w-full p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[90vh] overflow-y-auto">
+              className="bg-white rounded-t-3xl sm:rounded-2xl border border-[#E0E0E0] shadow-xl max-w-lg w-full p-4 sm:p-6 space-y-4 sm:space-y-5 max-h-[88dvh] sm:max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between border-b border-[#E5E5E5] pb-3">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-[#F8F8F8] border border-[#E5E5E5] text-[#757575] flex items-center justify-center shrink-0">
@@ -4641,13 +4872,13 @@ export default function TailorPackStudio() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1E1E1E]/30 backdrop-blur-sm">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 14 }}
+              initial={{ opacity: 0, scale: 0.98, y: 24 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              exit={{ opacity: 0, scale: 0.98, y: 20 }}
               transition={MODAL_SPRING}
-              className="bg-white rounded-2xl border border-[#E0E0E0] shadow-2xl max-w-2xl w-full p-5 sm:p-7 space-y-5 max-h-[90vh] flex flex-col">
+              className="bg-white rounded-t-3xl sm:rounded-2xl border border-[#E0E0E0] shadow-2xl max-w-2xl w-full p-4 sm:p-7 space-y-4 sm:space-y-5 max-h-[88dvh] sm:max-h-[90vh] flex flex-col">
               {/* Modal Header */}
               <div className="flex items-start justify-between gap-3 border-b border-[#E5E5E5] pb-4">
                 <div className="flex items-center gap-3">
@@ -4988,5 +5219,6 @@ export default function TailorPackStudio() {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

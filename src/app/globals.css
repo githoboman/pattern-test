@@ -410,12 +410,27 @@ textarea::placeholder {
   color: #b0acab;
 }
 
-.scrollbar-hide {
+.scrollbar-hide,
+.scrollbar-none {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
-.scrollbar-hide::-webkit-scrollbar {
+.scrollbar-hide::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Opera */
+}
+
+html,
+body {
+  overscroll-behavior-x: none;
+}
+
+button,
+a,
+select,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .shimmer-box {
